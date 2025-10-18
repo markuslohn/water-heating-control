@@ -1,0 +1,62 @@
+plugins {
+    id 'java'
+    id 'io.quarkus'
+    id 'com.diffplug.spotless' version '8.0.0'
+}
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+}
+
+dependencies {
+    implementation enforcedPlatform("${quarkusPlatformGroupId}:${quarkusPlatformArtifactId}:${quarkusPlatformVersion}")
+    implementation 'io.quarkus:quarkus-rest'
+    implementation 'io.quarkus:quarkus-smallrye-health'
+    implementation 'io.quarkus:quarkus-arc'
+    
+    // Modbus TCP client library
+    implementation 'com.digitalpetri.modbus:modbus-tcp:2.1.3'
+    
+    testImplementation 'io.quarkus:quarkus-junit5'
+    testImplementation 'io.rest-assured:rest-assured'
+}
+
+group = 'de.bimalo.homeauto'
+version = '1.0.0'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+test {
+    systemProperty "java.util.logging.manager", "org.jboss.logmanager.LogManager"
+}
+compileJava {
+    options.encoding = 'UTF-8'
+    options.compilerArgs << '-parameters'
+}
+
+compileTestJava {
+    options.encoding = 'UTF-8'
+}
+
+spotless {
+    java {
+        // Use Google Java Format
+        googleJavaFormat('1.22.0').aosp()
+        
+        // Remove unused imports
+        removeUnusedImports()
+        
+        // Fix imports order
+        importOrder()
+        
+        // Ensure consistent line endings
+        lineEndings 'UNIX'
+        
+        // Exclude generated files
+        targetExclude 'build/**', 'src/main/resources/**', 'src/test/resources/**'
+    }
+}
