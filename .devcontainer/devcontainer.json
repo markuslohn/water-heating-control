@@ -1,12 +1,11 @@
-// The Dev Container format allows you to configure your environment. At the heart of it
-// is a Docker image or Dockerfile which controls the tools available in your environment.
-//
-// See https://aka.ms/devcontainer.json for more information.
 {
 	"name": "Water Heating Controll Development Environment",
 	"build": {
         "context": ".",
-        "dockerfile": "Dockerfile"
+        "dockerfile": "Dockerfile",
+		"args": {
+        	"network": "host",
+        },
     },
 	"features": {
 		"ghcr.io/devcontainers/features/java:1": {
