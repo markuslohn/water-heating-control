@@ -63,13 +63,7 @@ spotless {
         indentWithSpaces(4)
         trimTrailingWhitespace()
         endWithNewline()
-        
-        // Remove unused imports
-        removeUnusedImports()
-        
-        // Fix imports order
-        importOrder()
-        
+          
         // Ensure consistent line endings
         lineEndings 'UNIX'
         

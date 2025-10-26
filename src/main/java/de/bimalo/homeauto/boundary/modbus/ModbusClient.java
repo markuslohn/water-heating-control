@@ -7,10 +7,6 @@ import com.digitalpetri.modbus.exceptions.ModbusTimeoutException;
 import com.digitalpetri.modbus.pdu.ReadHoldingRegistersRequest;
 import com.digitalpetri.modbus.pdu.ReadHoldingRegistersResponse;
 import com.digitalpetri.modbus.tcp.client.NettyTcpClientTransport;
-
-
-import io.netty.util.ReferenceCountUtil;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import lombok.extern.slf4j.Slf4j;
 
@@ -20,14 +16,14 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 public class ModbusClient {
-    
+
     private ModbusTcpClient client;
     private final String host;
     private final int port;
-    
+
     /**
      * Konstruktor für den Modbus-Client.
-     * 
+     *
      * @param host Die IP-Adresse oder Hostname des Modbus-Servers
      * @param port Der TCP-Port des Modbus-Servers
      */
@@ -35,27 +31,27 @@ public class ModbusClient {
         this.host = host;
         this.port = port;
     }
-    
+
     /**
      * Initialisiert die Modbus-Verbindung.
      */
     public void initialize() {
-        log.info("Initialisiere Modbus-Client für {}:{}", host, port);        
+        log.info("Initialisiere Modbus-Client für {}:{}", host, port);
 
         var transport = NettyTcpClientTransport.create(cfg -> {
-  cfg.setHostname("172.17.0.2");
-  cfg.setPort(502);
-});
+            cfg.setHostname(host);
+            cfg.setPort(port);
+        });
 
-client = ModbusTcpClient.create(transport);
-try {
-    client.connect();
-} catch (ModbusExecutionException e) {
-    throw new RuntimeException(e);
-}
+        client = ModbusTcpClient.create(transport);
+        try {
+            client.connect();
+        } catch (ModbusExecutionException e) {
+            throw new RuntimeException(e);
+        }
 
     }
-    
+
     /**
      * Beendet die Modbus-Verbindung sauber.
      */
@@ -69,23 +65,24 @@ try {
             }
         }
     }
-    
+
     /**
      * Liest Modbus-Register synchron aus.
-     * 
-     * @param address Die Startadresse der Register
+     *
+     * @param address  Die Startadresse der Register
      * @param quantity Die Anzahl der zu lesenden Register
      * @return Array mit den gelesenen Registerwerten
-     * @throws ExecutionException wenn ein Fehler beim Lesen auftritt
-     * @throws InterruptedException wenn die Operation unterbrochen wird
-     * @throws ModbusTimeoutException 
-     * @throws ModbusResponseException 
-     * @throws ModbusExecutionException 
+     * @throws ExecutionException       wenn ein Fehler beim Lesen auftritt
+     * @throws InterruptedException     wenn die Operation unterbrochen wird
+     * @throws ModbusTimeoutException
+     * @throws ModbusResponseException
+     * @throws ModbusExecutionException
      */
     public byte[] readRegistersSync(int address, int quantity) throws RuntimeException {
         try {
-        ReadHoldingRegistersResponse response = client.readHoldingRegisters(1,new ReadHoldingRegistersRequest(address, quantity));
-        return response.registers();
+            ReadHoldingRegistersResponse response = client.readHoldingRegisters(1,
+                    new ReadHoldingRegistersRequest(address, quantity));
+            return response.registers();
         } catch (ModbusExecutionException | ModbusResponseException | ModbusTimeoutException e) {
             throw new RuntimeException(e);
         }

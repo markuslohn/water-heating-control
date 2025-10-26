@@ -11,12 +11,12 @@ import jakarta.validation.constraints.NotBlank;
  */
 @ConfigMapping(prefix = "battery")
 public interface BatteryStorageConfig {
-    
+
     /**
      * Modbus-spezifische Konfiguration.
      */
     ModbusConfig modbus();
-    
+
     /**
      * Modbus Konfiguration.
      */
@@ -26,7 +26,7 @@ public interface BatteryStorageConfig {
          */
         @NotBlank
         String host();
-        
+
         /**
          * TCP-Port des E3/DC Systems.
          */

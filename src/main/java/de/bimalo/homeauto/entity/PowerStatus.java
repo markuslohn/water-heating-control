@@ -13,16 +13,16 @@ import lombok.ToString;
 public class PowerStatus {
     /** Zeitstempel der Messung */
     private final LocalDateTime timestamp;
-    
+
     /** Aktuelle PV-Leistung in Watt */
     private final int powerProduction;
-    
+
     /** Aktueller Hausverbrauch in Watt */
     private final int powerConsumption;
-    
+
     /** Aktueller Ladezustand in Prozent (0-100) */
     private final int batteryStateOfCharge;
-    
+
     @Builder
     public PowerStatus(int powerProduction, int powerConsumption, int batteryStateOfCharge) {
         this.timestamp = LocalDateTime.now();
