@@ -1,12 +1,12 @@
 {
-	"name": "Water Heating Controll Development Environment",
+	"name": "Water Heating Control Development Environment",
 	"build": {
-        "context": ".",
-        "dockerfile": "Dockerfile",
+		"context": ".",
+		"dockerfile": "Dockerfile",
 		"args": {
-        	"network": "host",
-        },
-    },
+			"network": "host",
+		},
+	},
 	"features": {
 		"ghcr.io/devcontainers/features/java:1": {
 			"version": "latest",
@@ -15,8 +15,10 @@
 		"ghcr.io/devcontainers/features/git:1": {},
 		"ghcr.io/devcontainers-extra/features/gradle-sdkman:2": {
 			"version": "latest"
+		},
+		"ghcr.io/rocker-org/devcontainer-features/apt-packages:1": {
+			"packages": "curl,traceroute,iputils-ping"
 		}
-        "ghcr.io/devcontainers/features/git:1": {}
 	},
 	// Configure tool-specific properties
 	"customizations": {
@@ -29,7 +31,11 @@
 		}
 	},
 	// Use 'forwardPorts' to make a list of ports inside the container available locally
-	"forwardPorts": [8080, 8081],
+	"forwardPorts": [
+		8080,
+		8081,
+		5005
+	],
 	// Use 'postCreateCommand' to run commands after the container is created
 	"postCreateCommand": "echo 'Development Environment ready!'"
 }
