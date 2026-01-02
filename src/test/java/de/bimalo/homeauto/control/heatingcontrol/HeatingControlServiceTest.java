@@ -1,5 +1,7 @@
 package de.bimalo.homeauto.control.heatingcontrol;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.lenient;
@@ -10,8 +12,11 @@ import static org.mockito.Mockito.when;
 import de.bimalo.homeauto.boundary.modbus.ModbusReadException;
 import de.bimalo.homeauto.control.battery.BatteryStorageService;
 import de.bimalo.homeauto.control.heatingrod.HeatingRodService;
+import de.bimalo.homeauto.entity.BatteryStatus;
+import de.bimalo.homeauto.entity.Percentage;
 import de.bimalo.homeauto.entity.Power;
 import de.bimalo.homeauto.entity.Temperature;
+import java.time.LocalDateTime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,6 +49,9 @@ class HeatingControlServiceTest {
         lenient().when(config.enabled()).thenReturn(true);
         lenient().when(config.minSurplusPower()).thenReturn(100);
         lenient().when(config.maxHeatingPower()).thenReturn(3000);
+        lenient().when(config.batteryPriorityEnabled()).thenReturn(true);
+        lenient().when(config.batteryPriorityThreshold()).thenReturn(60);
+        lenient().when(config.batteryReservedPower()).thenReturn(1000);
     }
 
     @Test
@@ -102,11 +110,13 @@ class HeatingControlServiceTest {
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         Power baseSurplus = Power.ofWatts(50); // Below minimum of 100W
         Power currentHeatingPower = Power.ofWatts(200);
+        BatteryStatus batteryStatus = createBatteryStatus(70); // SOC above threshold
 
         when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
         when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
         when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
         when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
 
         // When
         heatingControlService.controlHeating();
@@ -125,11 +135,13 @@ class HeatingControlServiceTest {
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         Power baseSurplus = Power.ofWatts(-200); // Negative surplus
         Power currentHeatingPower = Power.ofWatts(150); // Current heating
+        BatteryStatus batteryStatus = createBatteryStatus(70); // SOC above threshold
 
         when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
         when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
         when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
         when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
 
         // When
         heatingControlService.controlHeating();
@@ -146,11 +158,13 @@ class HeatingControlServiceTest {
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         Power baseSurplus = Power.ofWatts(1500);
         Power currentHeatingPower = Power.ofWatts(200);
+        BatteryStatus batteryStatus = createBatteryStatus(70); // SOC above threshold
 
         when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
         when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
         when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
         when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
 
         // When
         heatingControlService.controlHeating();
@@ -167,11 +181,13 @@ class HeatingControlServiceTest {
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         Power baseSurplus = Power.ofWatts(3500); // Exceeds max of 3000W
         Power currentHeatingPower = Power.ofWatts(200);
+        BatteryStatus batteryStatus = createBatteryStatus(70); // SOC above threshold
 
         when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
         when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
         when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
         when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
 
         // When
         heatingControlService.controlHeating();
@@ -188,11 +204,13 @@ class HeatingControlServiceTest {
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         Power baseSurplus = Power.ofWatts(2800);
         Power currentHeatingPower = Power.ofWatts(200);
+        BatteryStatus batteryStatus = createBatteryStatus(70); // SOC above threshold
 
         when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
         when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
         when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
         when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
 
         // When
         heatingControlService.controlHeating();
@@ -209,11 +227,13 @@ class HeatingControlServiceTest {
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         Power baseSurplus = Power.ofWatts(1200);
         Power currentHeatingPower = Power.ofWatts(0); // Not currently heating
+        BatteryStatus batteryStatus = createBatteryStatus(70); // SOC above threshold
 
         when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
         when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
         when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
         when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
 
         // When
         heatingControlService.controlHeating();
@@ -244,11 +264,13 @@ class HeatingControlServiceTest {
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         Power baseSurplus = Power.ofWatts(50);
         Power currentHeatingPower = Power.ofWatts(50);
+        BatteryStatus batteryStatus = createBatteryStatus(70); // SOC above threshold
 
         when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
         when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
         when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
         when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
 
         // When
         heatingControlService.controlHeating();
@@ -265,11 +287,13 @@ class HeatingControlServiceTest {
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         Power baseSurplus = Power.ofWatts(49);
         Power currentHeatingPower = Power.ofWatts(50);
+        BatteryStatus batteryStatus = createBatteryStatus(70); // SOC above threshold
 
         when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
         when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
         when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
         when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
 
         // When
         heatingControlService.controlHeating();
@@ -277,5 +301,335 @@ class HeatingControlServiceTest {
         // Then
         // Total surplus = 49 + 50 = 99W, just below minimum of 100W
         verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 0));
+    }
+
+    // ==================== Battery Priority Tests ====================
+
+    @Test
+    void testControlHeating_WhenBatteryPriorityActive_AndSocBelowThreshold_ShouldReservePower() {
+        // Given
+        Temperature currentTemp = Temperature.ofCelsius(50.0);
+        Temperature targetTemp = Temperature.ofCelsius(68.0);
+        Power baseSurplus = Power.ofWatts(2000);
+        Power currentHeatingPower = Power.ofWatts(0);
+        BatteryStatus batteryStatus = createBatteryStatus(50); // SOC 50% < threshold 60%
+
+        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
+        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
+        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
+        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(config.batteryPriorityEnabled()).thenReturn(true);
+        when(config.batteryPriorityThreshold()).thenReturn(60);
+        when(config.batteryReservedPower()).thenReturn(1000);
+
+        // When
+        heatingControlService.controlHeating();
+
+        // Then
+        // Adjusted surplus = 2000 + 0 = 2000W
+        // Battery priority active: 2000 - 1000 (reserved) = 1000W available for heating
+        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 1000));
+    }
+
+    @Test
+    void testControlHeating_WhenBatteryPriorityActive_AndSocAboveThreshold_ShouldNotReservePower() {
+        // Given
+        Temperature currentTemp = Temperature.ofCelsius(50.0);
+        Temperature targetTemp = Temperature.ofCelsius(68.0);
+        Power baseSurplus = Power.ofWatts(2000);
+        Power currentHeatingPower = Power.ofWatts(0);
+        BatteryStatus batteryStatus = createBatteryStatus(70); // SOC 70% > threshold 60%
+
+        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
+        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
+        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
+        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(config.batteryPriorityEnabled()).thenReturn(true);
+        when(config.batteryPriorityThreshold()).thenReturn(60);
+
+        // When
+        heatingControlService.controlHeating();
+
+        // Then
+        // Battery priority not active (SOC above threshold): full 2000W available for heating
+        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 2000));
+    }
+
+    @Test
+    void testControlHeating_WhenBatteryPriorityDisabledInConfig_ShouldNotReservePower() {
+        // Given
+        Temperature currentTemp = Temperature.ofCelsius(50.0);
+        Temperature targetTemp = Temperature.ofCelsius(68.0);
+        Power baseSurplus = Power.ofWatts(2000);
+        Power currentHeatingPower = Power.ofWatts(0);
+        BatteryStatus batteryStatus = createBatteryStatus(50); // SOC 50% < threshold 60%
+
+        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
+        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
+        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
+        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(config.batteryPriorityEnabled()).thenReturn(false); // Disabled in config
+
+        // When
+        heatingControlService.controlHeating();
+
+        // Then
+        // Battery priority disabled: full 2000W available despite low SOC
+        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 2000));
+    }
+
+    @Test
+    void testControlHeating_WhenBatteryPriorityReservesTooMuch_ShouldStopHeating() {
+        // Given
+        Temperature currentTemp = Temperature.ofCelsius(50.0);
+        Temperature targetTemp = Temperature.ofCelsius(68.0);
+        Power baseSurplus = Power.ofWatts(800); // Less than reserved power
+        Power currentHeatingPower = Power.ofWatts(0);
+        BatteryStatus batteryStatus = createBatteryStatus(50); // SOC 50% < threshold 60%
+
+        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
+        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
+        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
+        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(config.batteryPriorityEnabled()).thenReturn(true);
+        when(config.batteryPriorityThreshold()).thenReturn(60);
+        when(config.batteryReservedPower()).thenReturn(1000);
+
+        // When
+        heatingControlService.controlHeating();
+
+        // Then
+        // Adjusted surplus = 800 + 0 = 800W
+        // Battery priority: 800 - 1000 = -200W (capped to 0)
+        // 0W < minimum 100W, so heating stops
+        verify(heatingRodService, never()).adjustHeating(any());
+    }
+
+    @Test
+    void testControlHeating_WhenBatteryPriorityActive_WithCurrentHeating_ShouldAccountForIt() {
+        // Given
+        Temperature currentTemp = Temperature.ofCelsius(50.0);
+        Temperature targetTemp = Temperature.ofCelsius(68.0);
+        Power baseSurplus = Power.ofWatts(1500);
+        Power currentHeatingPower = Power.ofWatts(500); // Currently heating
+        BatteryStatus batteryStatus = createBatteryStatus(45); // SOC 45% < threshold 60%
+
+        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
+        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
+        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
+        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(config.batteryPriorityEnabled()).thenReturn(true);
+        when(config.batteryPriorityThreshold()).thenReturn(60);
+        when(config.batteryReservedPower()).thenReturn(1000);
+
+        // When
+        heatingControlService.controlHeating();
+
+        // Then
+        // Adjusted surplus = 1500 + 500 = 2000W
+        // Battery priority: 2000 - 1000 = 1000W available for heating
+        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 1000));
+    }
+
+    @Test
+    void testControlHeating_WhenBatteryPriorityAtExactThreshold_ShouldNotReservePower() {
+        // Given
+        Temperature currentTemp = Temperature.ofCelsius(50.0);
+        Temperature targetTemp = Temperature.ofCelsius(68.0);
+        Power baseSurplus = Power.ofWatts(2000);
+        Power currentHeatingPower = Power.ofWatts(0);
+        BatteryStatus batteryStatus = createBatteryStatus(60); // SOC 60% = threshold 60%
+
+        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
+        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
+        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
+        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(config.batteryPriorityEnabled()).thenReturn(true);
+        when(config.batteryPriorityThreshold()).thenReturn(60);
+
+        // When
+        heatingControlService.controlHeating();
+
+        // Then
+        // SOC equals threshold, priority not active: full 2000W available
+        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 2000));
+    }
+
+    @Test
+    void testControlHeating_WhenBatteryPriorityJustBelowThreshold_ShouldReservePower() {
+        // Given
+        Temperature currentTemp = Temperature.ofCelsius(50.0);
+        Temperature targetTemp = Temperature.ofCelsius(68.0);
+        Power baseSurplus = Power.ofWatts(2000);
+        Power currentHeatingPower = Power.ofWatts(0);
+        BatteryStatus batteryStatus = createBatteryStatus(59); // SOC 59% < threshold 60%
+
+        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
+        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
+        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
+        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(config.batteryPriorityEnabled()).thenReturn(true);
+        when(config.batteryPriorityThreshold()).thenReturn(60);
+        when(config.batteryReservedPower()).thenReturn(1000);
+
+        // When
+        heatingControlService.controlHeating();
+
+        // Then
+        // SOC just below threshold, priority active: 2000 - 1000 = 1000W
+        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 1000));
+    }
+
+    @Test
+    void testControlHeating_WhenBatteryPriorityActive_AndMaxPowerStillApplies() {
+        // Given
+        Temperature currentTemp = Temperature.ofCelsius(50.0);
+        Temperature targetTemp = Temperature.ofCelsius(68.0);
+        Power baseSurplus = Power.ofWatts(5000); // Very high surplus
+        Power currentHeatingPower = Power.ofWatts(0);
+        BatteryStatus batteryStatus = createBatteryStatus(50); // SOC 50% < threshold 60%
+
+        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
+        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
+        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
+        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(config.batteryPriorityEnabled()).thenReturn(true);
+        when(config.batteryPriorityThreshold()).thenReturn(60);
+        when(config.batteryReservedPower()).thenReturn(1000);
+        when(config.maxHeatingPower()).thenReturn(3000);
+
+        // When
+        heatingControlService.controlHeating();
+
+        // Then
+        // Adjusted surplus = 5000 + 0 = 5000W
+        // Battery priority: 5000 - 1000 = 4000W
+        // Max heating power limits to 3000W
+        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 3000));
+    }
+
+    @Test
+    void testBatteryPriorityOverride_WhenDisabled_ShouldIgnoreBatteryPriority() {
+        // Given
+        Temperature currentTemp = Temperature.ofCelsius(50.0);
+        Temperature targetTemp = Temperature.ofCelsius(68.0);
+        Power baseSurplus = Power.ofWatts(2000);
+        Power currentHeatingPower = Power.ofWatts(0);
+        BatteryStatus batteryStatus = createBatteryStatus(50); // SOC 50% < threshold 60%
+
+        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
+        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
+        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
+        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(config.batteryPriorityEnabled()).thenReturn(true);
+        when(config.batteryPriorityThreshold()).thenReturn(60);
+        // batteryReservedPower not mocked - not used when override is active
+
+        // When
+        heatingControlService.setBatteryPriorityOverride(true); // Disable battery priority
+        heatingControlService.controlHeating();
+
+        // Then
+        // Override active, battery priority ignored: full 2000W available
+        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 2000));
+    }
+
+    @Test
+    void testBatteryPriorityOverride_WhenEnabled_ShouldApplyBatteryPriority() {
+        // Given
+        Temperature currentTemp = Temperature.ofCelsius(50.0);
+        Temperature targetTemp = Temperature.ofCelsius(68.0);
+        Power baseSurplus = Power.ofWatts(2000);
+        Power currentHeatingPower = Power.ofWatts(0);
+        BatteryStatus batteryStatus = createBatteryStatus(50); // SOC 50% < threshold 60%
+
+        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
+        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
+        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
+        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(config.batteryPriorityEnabled()).thenReturn(true);
+        when(config.batteryPriorityThreshold()).thenReturn(60);
+        when(config.batteryReservedPower()).thenReturn(1000);
+
+        // When
+        heatingControlService.setBatteryPriorityOverride(false); // Enable battery priority
+        heatingControlService.controlHeating();
+
+        // Then
+        // Override not active, battery priority applies: 2000 - 1000 = 1000W
+        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 1000));
+    }
+
+    @Test
+    void testIsBatteryPriorityActive_WhenConfigEnabledAndNoOverride() {
+        // Given
+        when(config.batteryPriorityEnabled()).thenReturn(true);
+
+        // When
+        boolean isActive = heatingControlService.isBatteryPriorityActive();
+
+        // Then
+        assertTrue(isActive);
+    }
+
+    @Test
+    void testIsBatteryPriorityActive_WhenConfigEnabledButOverrideDisabled() {
+        // Given
+        when(config.batteryPriorityEnabled()).thenReturn(true);
+        heatingControlService.setBatteryPriorityOverride(true); // Disable via override
+
+        // When
+        boolean isActive = heatingControlService.isBatteryPriorityActive();
+
+        // Then
+        assertFalse(isActive);
+    }
+
+    @Test
+    void testIsBatteryPriorityActive_WhenConfigDisabled() {
+        // Given
+        when(config.batteryPriorityEnabled()).thenReturn(false);
+
+        // When
+        boolean isActive = heatingControlService.isBatteryPriorityActive();
+
+        // Then
+        assertFalse(isActive);
+    }
+
+    @Test
+    void testResetBatteryPriorityOverride_ShouldReEnablePriority() {
+        // Given
+        when(config.batteryPriorityEnabled()).thenReturn(true);
+        heatingControlService.setBatteryPriorityOverride(true); // Disable
+        assertFalse(heatingControlService.isBatteryPriorityActive());
+
+        // When
+        heatingControlService.resetBatteryPriorityOverride(); // Midnight reset
+
+        // Then
+        assertTrue(heatingControlService.isBatteryPriorityActive());
+    }
+
+    // Helper method to create BatteryStatus with specific SOC
+    private BatteryStatus createBatteryStatus(int socPercent) {
+        return BatteryStatus.builder()
+                .timestamp(LocalDateTime.now())
+                .productionPower(Power.ofWatts(0))
+                .consumptionPower(Power.ofWatts(0))
+                .batteryPower(Power.ofWatts(0))
+                .gridPower(Power.ofWatts(0))
+                .batteryStateOfCharge(Percentage.of(socPercent))
+                .build();
     }
 }

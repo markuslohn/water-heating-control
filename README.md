@@ -40,7 +40,8 @@ The application includes a modern, responsive web interface for monitoring and m
 - Real-time battery status (SOC, production, consumption, grid power)
 - Current heating rod status (power, temperatures)
 - Manual heating control with custom power settings
-- Auto-refresh every 3 seconds
+- Battery priority override (disable until midnight)
+- Auto-refresh every 10 seconds
 
 ## Configuration
 
@@ -79,7 +80,24 @@ heatingctl.max-heating-power=3000
 # Schedule interval for automatic control checks
 # Supports duration expressions: "1m", "30s", "2m30s"
 heatingctl.schedule-interval=1m
+
+# Battery Priority Configuration
+# Master switch to enable/disable battery priority feature completely
+heatingctl.battery-priority-enabled=true
+
+# If battery SOC is below this threshold (in %), reserve power for battery charging
+heatingctl.battery-priority-threshold=60
+
+# Power (in watts) reserved for battery charging when SOC is below threshold
+# This ensures the battery gets charged before using power for heating
+heatingctl.battery-reserved-power=1000
 ```
+
+**Battery Priority Override:**
+- Use the web interface to temporarily disable battery priority until midnight
+- REST API: `POST /api/battery/priority?disabled=true` (disable) or `?disabled=false` (enable)
+- Override automatically resets at midnight
+- Useful for days when you know the battery won't reach full charge
 
 ### Quarkus Scheduler Settings
 
@@ -143,6 +161,8 @@ Access at `http://localhost:8080/q/health`
 
 **API Endpoints:**
 - Battery Status: `GET http://localhost:8080/api/battery/status`
+- Battery Priority Status: `GET http://localhost:8080/api/battery/priority`
+- Battery Priority Override: `POST http://localhost:8080/api/battery/priority?disabled=<true/false>`
 - Heating Status: `GET http://localhost:8080/api/heatingrod/status`
 - Manual Control: `POST http://localhost:8080/api/heatingrod/control?watts=<value>`
 
@@ -163,14 +183,26 @@ Access at `http://localhost:8080/q/health`
    - Current and target temperatures of the heating rod
    - Whether heating should be active
 
-2. **Decision making**:
+2. **Battery Priority** (optimization feature):
+   - If battery priority is enabled (config + not overridden):
+     - If battery SOC < configured threshold (default: 60%)
+       - Reserves power for battery charging (default: 1000W)
+       - Only surplus above reserved power is available for heating
+     - If battery SOC ≥ threshold
+       - All surplus power is available for heating
+   - Runtime override available via web UI or REST API
+     - Temporarily disables battery priority until midnight
+     - Auto-resets at 00:00
+
+3. **Decision making**:
    - If target temperature is reached → stop heating
    - If surplus power < minimum threshold → stop heating
    - If surplus power available → adjust heating power to match surplus (up to maximum)
 
-3. **Power adjustment**:
+4. **Power adjustment**:
    - Automatically accounts for current heating power in surplus calculation
    - Respects configured maximum power limit
+   - Prioritizes battery charging when SOC is low
    - Sends commands via Modbus to ELWA2
 
 ## Java 25 Compatibility

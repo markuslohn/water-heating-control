@@ -39,4 +39,31 @@ public interface HeatingControlConfig {
      */
     @WithDefault("1m")
     String scheduleInterval();
+
+    /**
+     * Master switch to enable/disable battery priority feature completely.
+     * If false, battery priority logic is never applied regardless of SOC.
+     */
+    @WithDefault("true")
+    boolean batteryPriorityEnabled();
+
+    /**
+     * Battery state of charge threshold (in percent) below which battery charging
+     * has priority.
+     * If the battery SOC is below this threshold, a portion of surplus power is
+     * reserved for battery charging instead of heating.
+     */
+    @Min(0)
+    @WithDefault("60")
+    int batteryPriorityThreshold();
+
+    /**
+     * Power reserved for battery charging (in watts) when battery SOC is below
+     * threshold.
+     * This amount will be subtracted from available surplus to ensure the battery
+     * gets charged.
+     */
+    @Min(0)
+    @WithDefault("1000")
+    int batteryReservedPower();
 }

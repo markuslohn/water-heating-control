@@ -273,6 +273,23 @@
             </div>
         </div>
 
+        <!-- Batterie-Priorität Steuerung -->
+        <div class="control-box" style="margin-top: 20px;">
+            <h2>🔋 Batterie-Priorität</h2>
+            <div class="status-item">
+                <span class="status-label">Status:</span>
+                <span class="status-value" id="battery-priority-status">-</span>
+            </div>
+            <div class="control-group" style="margin-top: 15px;">
+                <button class="btn-primary" onclick="enableBatteryPriority()">Aktivieren</button>
+                <button class="btn-danger" onclick="disableBatteryPriority()">Deaktivieren (bis Mitternacht)</button>
+            </div>
+            <p style="margin-top: 15px; color: #666; font-size: 0.9em;">
+                Wenn deaktiviert, wird die Batterie-Priorisierung bis Mitternacht ausgesetzt.
+                Die gesamte Überschussleistung steht dann für den Heizstab zur Verfügung.
+            </p>
+        </div>
+
         <div class="last-update">
             Letzte Aktualisierung: <span id="last-update">-</span>
         </div>
@@ -334,6 +351,16 @@
                 const box = document.getElementById('heating-status-box');
                 box.className = 'status-box ' + (heating.active ? 'heating-active' : 'heating-inactive');
 
+                // Battery Priority Status
+                console.log('[DEBUG] Fetching battery priority status...');
+                const priorityResponse = await fetch('/api/battery/priority');
+                console.log('[DEBUG] Battery priority response status:', priorityResponse.status);
+
+                const priorityData = await priorityResponse.json();
+                console.log('[DEBUG] Battery priority data:', priorityData);
+
+                document.getElementById('battery-priority-status').textContent = priorityData.active ? '🟢 AKTIV' : '🔴 DEAKTIVIERT';
+
                 // Update timestamp
                 document.getElementById('last-update').textContent = new Date().toLocaleTimeString('de-DE');
                 console.log('[DEBUG] Update completed successfully');
@@ -370,6 +397,38 @@
                 updateStatus();
             } catch (error) {
                 alert('Fehler beim Stoppen der Heizung: ' + error.message);
+            }
+        }
+
+        async function enableBatteryPriority() {
+            try {
+                const response = await fetch('/api/battery/priority?disabled=false', { method: 'POST' });
+                if (response.ok) {
+                    const result = await response.text();
+                    alert(result);
+                    updateStatus();
+                } else {
+                    const error = await response.text();
+                    alert('Fehler: ' + error);
+                }
+            } catch (error) {
+                alert('Fehler beim Aktivieren der Batterie-Priorität: ' + error.message);
+            }
+        }
+
+        async function disableBatteryPriority() {
+            try {
+                const response = await fetch('/api/battery/priority?disabled=true', { method: 'POST' });
+                if (response.ok) {
+                    const result = await response.text();
+                    alert(result + '\n\nDie Batterie-Priorität wird automatisch um Mitternacht wieder aktiviert.');
+                    updateStatus();
+                } else {
+                    const error = await response.text();
+                    alert('Fehler: ' + error);
+                }
+            } catch (error) {
+                alert('Fehler beim Deaktivieren der Batterie-Priorität: ' + error.message);
             }
         }
     </script>

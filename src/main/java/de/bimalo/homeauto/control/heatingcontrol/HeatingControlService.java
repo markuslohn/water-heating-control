@@ -7,6 +7,7 @@ import de.bimalo.homeauto.entity.Temperature;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import java.time.LocalDate;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -21,6 +22,10 @@ public class HeatingControlService {
     private final HeatingControlConfig config;
     private final BatteryStorageService batteryStorageService;
     private final HeatingRodService heatingRodService;
+
+    // Runtime override for battery priority (resets at midnight)
+    private volatile boolean batteryPriorityRuntimeOverride = false;
+    private volatile LocalDate overrideDate = null;
 
     @Inject
     public HeatingControlService(
@@ -107,6 +112,8 @@ public class HeatingControlService {
      * Checks the available solar power surplus.
      * Adjusts the surplus by adding the current heating rod power, as it is already
      * included in the house consumption measurement.
+     * If battery SOC is below threshold and battery priority is enabled (both config and runtime),
+     * reserves power for battery charging.
      *
      * @return Power object representing the adjusted surplus power available for
      *         heating
@@ -119,10 +126,30 @@ public class HeatingControlService {
         // consumption)
         long adjustedSurplus = baseSurplus.getWatts() + currentHeatingPower.getWatts();
 
-        log.debug("Solar surplus: {} W (base: {} W + current heating: {} W)",
-                adjustedSurplus, baseSurplus.getWatts(), currentHeatingPower.getWatts());
+        // Check if battery priority is active (both config and runtime override must be enabled)
+        boolean batteryPriorityActive = config.batteryPriorityEnabled() && !batteryPriorityRuntimeOverride;
+        int currentSoc = batteryStorageService.getCurrentStatus().getBatteryStateOfCharge().getValue();
+        long availableForHeating = adjustedSurplus;
 
-        return Power.ofWatts(adjustedSurplus);
+        if (batteryPriorityActive && currentSoc < config.batteryPriorityThreshold()) {
+            // Reserve power for battery charging
+            availableForHeating = adjustedSurplus - config.batteryReservedPower();
+
+            log.info("Battery priority active (SOC: {}% < {}%): Reserving {} W for battery, {} W available for heating",
+                    currentSoc, config.batteryPriorityThreshold(),
+                    config.batteryReservedPower(), Math.max(0, availableForHeating));
+        } else {
+            if (!batteryPriorityActive && currentSoc < config.batteryPriorityThreshold()) {
+                log.info("Battery priority DISABLED (override active) - Solar surplus: {} W, Battery SOC: {}%",
+                        adjustedSurplus, currentSoc);
+            } else {
+                log.info("Solar surplus: {} W (base: {} W + current heating: {} W), Battery SOC: {}%",
+                        adjustedSurplus, baseSurplus.getWatts(), currentHeatingPower.getWatts(), currentSoc);
+            }
+        }
+
+        // Ensure we don't return negative values
+        return Power.ofWatts(Math.max(0, availableForHeating));
     }
 
     /**
@@ -148,5 +175,44 @@ public class HeatingControlService {
         log.info("Adjusting heating to {} W (temperature: {}°C, target: {}°C)",
                 surplusPower.getWatts(), tempCheck.currentCelsius(), tempCheck.targetCelsius());
         heatingRodService.adjustHeating(surplusPower);
+    }
+
+    /**
+     * Sets the battery priority runtime override.
+     * When enabled, battery priority logic is temporarily disabled until midnight.
+     *
+     * @param disabled true to disable battery priority, false to enable it
+     */
+    public void setBatteryPriorityOverride(boolean disabled) {
+        this.batteryPriorityRuntimeOverride = disabled;
+        if (disabled) {
+            this.overrideDate = LocalDate.now();
+            log.info("Battery priority DISABLED via runtime override (will reset at midnight)");
+        } else {
+            this.overrideDate = null;
+            log.info("Battery priority ENABLED via runtime override");
+        }
+    }
+
+    /**
+     * Gets the current state of battery priority (considering both config and runtime override).
+     *
+     * @return true if battery priority is active, false if disabled
+     */
+    public boolean isBatteryPriorityActive() {
+        return config.batteryPriorityEnabled() && !batteryPriorityRuntimeOverride;
+    }
+
+    /**
+     * Resets the battery priority override at midnight.
+     * Runs every day at midnight to re-enable battery priority.
+     */
+    @Scheduled(cron = "0 0 0 * * ?")
+    public void resetBatteryPriorityOverride() {
+        if (batteryPriorityRuntimeOverride) {
+            log.info("Midnight reset: Re-enabling battery priority");
+            batteryPriorityRuntimeOverride = false;
+            overrideDate = null;
+        }
     }
 }
