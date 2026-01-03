@@ -1,6 +1,7 @@
 package de.bimalo.homeauto.control.heatingcontrol;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -303,6 +304,18 @@ class HeatingControlServiceTest {
         verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 0));
     }
 
+    @Test
+    void testControlHeating_WhenPowerFromBattery_ShouldCalculateCorrectly() {
+
+        Power productionPower = Power.ofWatts(800);
+        Power houseConsumptionPower = Power.ofWatts(2300);
+        Power batteryPower = Power.ofWatts(-1300);
+
+        Power surplusPower = productionPower.subtract(houseConsumptionPower).subtract(batteryPower);
+        assertNotNull(surplusPower);
+
+    }
+
     // ==================== Battery Priority Tests ====================
 
     @Test
@@ -353,7 +366,8 @@ class HeatingControlServiceTest {
         heatingControlService.controlHeating();
 
         // Then
-        // Battery priority not active (SOC above threshold): full 2000W available for heating
+        // Battery priority not active (SOC above threshold): full 2000W available for
+        // heating
         verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 2000));
     }
 

@@ -121,6 +121,7 @@ public class HeatingControlService {
     private Power checkSurplusPower() {
         Power baseSurplus = batteryStorageService.determineSolarPowerSurplus();
         Power currentHeatingPower = heatingRodService.readPower();
+        Power batteryPower = batteryStorageService.getCurrentStatus().getBatteryPower();
 
         // Add current heating power back to surplus (it's already included in house
         // consumption)
@@ -130,6 +131,14 @@ public class HeatingControlService {
         boolean batteryPriorityActive = config.batteryPriorityEnabled() && !batteryPriorityRuntimeOverride;
         int currentSoc = batteryStorageService.getCurrentStatus().getBatteryStateOfCharge().getValue();
         long availableForHeating = adjustedSurplus;
+
+        // If battery priority is DISABLED and battery is charging, add that power back
+        // (heating has priority over battery charging)
+        if (!batteryPriorityActive && batteryPower.isPositive()) {
+            availableForHeating += batteryPower.getWatts();
+            log.debug("Battery priority disabled: Adding battery charging power {} W to available heating power",
+                    batteryPower.getWatts());
+        }
 
         if (batteryPriorityActive && currentSoc < config.batteryPriorityThreshold()) {
             // Reserve power for battery charging

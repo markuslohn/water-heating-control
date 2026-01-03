@@ -48,12 +48,26 @@ public class BatteryStorageService {
                 .build();
     }
 
+    /**
+     * Determines the pure solar power surplus available.
+     * Only counts actual solar production, not battery discharge.
+     *
+     * @return Power surplus from solar only (battery discharge is not counted)
+     */
     public Power determineSolarPowerSurplus() {
         Power productionPower = readProductionPower();
         Power houseConsumptionPower = readHouseConsumptionPower();
         Power batteryPower = readBatteryPower();
 
-        Power surplusPower = productionPower.subtract(houseConsumptionPower).subtract(batteryPower);
+        // Base solar surplus: Production - Consumption
+        Power surplusPower = productionPower.subtract(houseConsumptionPower);
+
+        // If battery is charging, this solar power is not available for other use
+        if (batteryPower.isPositive()) {
+            surplusPower = surplusPower.subtract(batteryPower);
+        }
+        // If battery is discharging (negative), we ignore it - it's not solar power
+
         if (surplusPower.isNegative()) {
             return Power.ofWatts(0);
         } else {
