@@ -91,6 +91,12 @@ heatingctl.battery-priority-threshold=60
 # Power (in watts) reserved for battery charging when SOC is below threshold
 # This ensures the battery gets charged before using power for heating
 heatingctl.battery-reserved-power=1000
+
+# Temperature Hysteresis Configuration
+# Temperature difference (in °C) for restart after target is reached
+# Prevents frequent on/off cycling when temperature fluctuates near target
+# Example: With target 68°C and hysteresis 10°C, heating restarts at 58°C
+heatingctl.temperature-hysteresis=10.0
 ```
 
 **Battery Priority Override:**
@@ -194,12 +200,29 @@ Access at `http://localhost:8080/q/health`
      - Temporarily disables battery priority until midnight
      - Auto-resets at 00:00
 
-3. **Decision making**:
-   - If target temperature is reached → stop heating
+3. **Temperature Hysteresis** (prevents on/off cycling):
+   - When target temperature is reached (e.g., 68°C):
+     - Heating stops and enters "cooling mode"
+     - Heating remains off even if surplus is available
+   - Heating only restarts when temperature drops below (target - hysteresis):
+     - Example: With 10°C hysteresis, restarts at 58°C
+     - Prevents frequent on/off cycling near target temperature
+   - Configurable hysteresis value (default: 10°C)
+
+4. **Surplus Power Calculation**:
+   - When battery priority is **ENABLED**:
+     - Heating uses: Production - Consumption - Battery Charging
+     - If battery charging: Reserved power is subtracted
+   - When battery priority is **DISABLED**:
+     - Heating uses: Production - Consumption
+     - Battery charging power is added back (heating has priority)
+
+5. **Decision making**:
+   - If in cooling mode and temperature > restart threshold → keep heating off
    - If surplus power < minimum threshold → stop heating
    - If surplus power available → adjust heating power to match surplus (up to maximum)
 
-4. **Power adjustment**:
+6. **Power adjustment**:
    - Automatically accounts for current heating power in surplus calculation
    - Respects configured maximum power limit
    - Prioritizes battery charging when SOC is low

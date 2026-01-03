@@ -27,6 +27,9 @@ public class HeatingControlService {
     private volatile boolean batteryPriorityRuntimeOverride = false;
     private volatile LocalDate overrideDate = null;
 
+    // Temperature hysteresis state: true when target reached and waiting for temperature to drop
+    private volatile boolean targetReachedCoolingMode = false;
+
     @Inject
     public HeatingControlService(
             HeatingControlConfig config,
@@ -50,10 +53,10 @@ public class HeatingControlService {
 
         try {
             TemperatureCheck tempCheck = checkTemperature();
-            if (tempCheck.targetReached()) {
-                stopHeating(String.format("Target temperature %.1f°C reached (current: %.1f°C)",
-                        tempCheck.targetCelsius(), tempCheck.currentCelsius()));
-                return;
+
+            // Check temperature with hysteresis
+            if (!handleTemperatureHysteresis(tempCheck)) {
+                return; // Heating blocked by hysteresis or target reached
             }
 
             Power surplusPower = checkSurplusPower();
@@ -106,6 +109,57 @@ public class HeatingControlService {
                 currentTemperature.getCelsius(), targetTemperature.getCelsius());
 
         return new TemperatureCheck(currentTemperature, targetTemperature);
+    }
+
+    /**
+     * Handles temperature hysteresis to prevent frequent on/off cycling.
+     * When target temperature is reached, heating only restarts when temperature
+     * drops below (target - hysteresis).
+     *
+     * @param tempCheck the temperature check result
+     * @return true if heating is allowed, false if blocked by hysteresis or target reached
+     */
+    private boolean handleTemperatureHysteresis(TemperatureCheck tempCheck) {
+        double hysteresis = config.temperatureHysteresis();
+        double restartThreshold = tempCheck.targetCelsius() - hysteresis;
+
+        // Check if target temperature was just reached
+        if (tempCheck.targetReached() && !targetReachedCoolingMode) {
+            targetReachedCoolingMode = true;
+            stopHeating(String.format("Target temperature %.1f°C reached (current: %.1f°C), entering cooling mode",
+                    tempCheck.targetCelsius(), tempCheck.currentCelsius()));
+            log.info("Hysteresis active: Heating will restart when temperature drops below %.1f°C",
+                    restartThreshold);
+            return false;
+        }
+
+        // If in cooling mode, check if we should exit
+        if (targetReachedCoolingMode) {
+            if (tempCheck.currentCelsius() < restartThreshold) {
+                // Temperature dropped enough, exit cooling mode
+                targetReachedCoolingMode = false;
+                log.info("Temperature dropped to %.1f°C (below restart threshold %.1f°C), exiting cooling mode",
+                        tempCheck.currentCelsius(), restartThreshold);
+                return true; // Allow heating to continue
+            } else {
+                // Still in cooling mode, block heating
+                log.debug("Cooling mode active: %.1f°C >= %.1f°C (target %.1f°C - hysteresis %.1f°C)",
+                        tempCheck.currentCelsius(), restartThreshold,
+                        tempCheck.targetCelsius(), hysteresis);
+                return false;
+            }
+        }
+
+        // Check if target is currently reached (but cooling mode not active)
+        if (tempCheck.targetReached()) {
+            targetReachedCoolingMode = true;
+            stopHeating(String.format("Target temperature %.1f°C reached (current: %.1f°C)",
+                    tempCheck.targetCelsius(), tempCheck.currentCelsius()));
+            return false;
+        }
+
+        // Normal operation, heating allowed
+        return true;
     }
 
     /**

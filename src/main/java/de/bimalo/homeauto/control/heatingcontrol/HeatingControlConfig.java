@@ -66,4 +66,14 @@ public interface HeatingControlConfig {
     @Min(0)
     @WithDefault("1000")
     int batteryReservedPower();
+
+    /**
+     * Temperature hysteresis in degrees Celsius.
+     * When target temperature is reached, heating only restarts when temperature
+     * drops below (target - hysteresis).
+     * This prevents frequent on/off cycling.
+     */
+    @Min(0)
+    @WithDefault("10.0")
+    double temperatureHysteresis();
 }

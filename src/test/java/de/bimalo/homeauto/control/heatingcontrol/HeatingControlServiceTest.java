@@ -635,6 +635,143 @@ class HeatingControlServiceTest {
         assertTrue(heatingControlService.isBatteryPriorityActive());
     }
 
+    // ==================== Temperature Hysteresis Tests ====================
+
+    @Test
+    void testControlHeating_WhenTargetReached_ShouldEnterCoolingMode() {
+        // Given
+        Temperature currentTemp = Temperature.ofCelsius(70.0);
+        Temperature targetTemp = Temperature.ofCelsius(68.0);
+        Power currentHeatingPower = Power.ofWatts(500);
+
+        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
+        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
+        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
+        when(config.temperatureHysteresis()).thenReturn(10.0);
+
+        // When
+        heatingControlService.controlHeating();
+
+        // Then
+        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 0));
+    }
+
+    @Test
+    void testControlHeating_InCoolingMode_TemperatureAboveRestartThreshold_ShouldNotHeat() {
+        // Given: First reach target temperature (70°C with target 68°C)
+        Temperature targetReachedTemp = Temperature.ofCelsius(70.0);
+        Temperature targetTemp = Temperature.ofCelsius(68.0);
+        when(heatingRodService.readTemperature1()).thenReturn(targetReachedTemp);
+        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
+        when(heatingRodService.readPower()).thenReturn(Power.ofWatts(500));
+        when(config.temperatureHysteresis()).thenReturn(10.0);
+
+        heatingControlService.controlHeating(); // Enter cooling mode
+
+        // Now temperature drops to 60°C (still above restart threshold of 58°C)
+        Temperature coolingTemp = Temperature.ofCelsius(60.0);
+
+        when(heatingRodService.readTemperature1()).thenReturn(coolingTemp);
+
+        // When
+        heatingControlService.controlHeating();
+
+        // Then - should NOT heat (still in cooling mode)
+        // Only the first call (entering cooling mode) should have called adjustHeating
+        verify(heatingRodService, never()).adjustHeating(argThat(power -> power.getWatts() > 0));
+    }
+
+    @Test
+    void testControlHeating_InCoolingMode_TemperatureBelowRestartThreshold_ShouldResumeHeating() {
+        // Given: First reach target temperature (70°C with target 68°C)
+        Temperature targetReachedTemp = Temperature.ofCelsius(70.0);
+        Temperature targetTemp = Temperature.ofCelsius(68.0);
+        when(heatingRodService.readTemperature1()).thenReturn(targetReachedTemp);
+        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
+        when(heatingRodService.readPower()).thenReturn(Power.ofWatts(500));
+        when(config.temperatureHysteresis()).thenReturn(10.0);
+
+        heatingControlService.controlHeating(); // Enter cooling mode
+
+        // Now temperature drops to 57°C (below restart threshold of 58°C)
+        Temperature restartTemp = Temperature.ofCelsius(57.0);
+        Power baseSurplus = Power.ofWatts(2000);
+        BatteryStatus batteryStatus = createBatteryStatus(70);
+
+        when(heatingRodService.readTemperature1()).thenReturn(restartTemp);
+        when(heatingRodService.readPower()).thenReturn(Power.ofWatts(0));
+        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+
+        // When
+        heatingControlService.controlHeating();
+
+        // Then - should resume heating
+        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 2000));
+    }
+
+    @Test
+    void testControlHeating_WithHysteresis_NormalHeatingWhenFarBelowTarget() {
+        // Given
+        Temperature currentTemp = Temperature.ofCelsius(50.0);
+        Temperature targetTemp = Temperature.ofCelsius(68.0);
+        Power baseSurplus = Power.ofWatts(1500);
+        Power currentHeatingPower = Power.ofWatts(0);
+        BatteryStatus batteryStatus = createBatteryStatus(70);
+
+        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
+        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
+        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
+        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(config.temperatureHysteresis()).thenReturn(10.0);
+
+        // When
+        heatingControlService.controlHeating();
+
+        // Then - should heat normally
+        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 1500));
+    }
+
+    @Test
+    void testControlHeating_HysteresisWithCustomValue_ShouldUseConfiguredHysteresis() {
+        // Given: Custom hysteresis of 5°C
+        Temperature targetReachedTemp = Temperature.ofCelsius(70.0);
+        Temperature targetTemp = Temperature.ofCelsius(68.0);
+        when(heatingRodService.readTemperature1()).thenReturn(targetReachedTemp);
+        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
+        when(heatingRodService.readPower()).thenReturn(Power.ofWatts(500));
+        when(config.temperatureHysteresis()).thenReturn(5.0); // 5°C hysteresis
+
+        heatingControlService.controlHeating(); // Enter cooling mode
+
+        // Temperature at 64°C (above restart threshold of 63°C with 5°C hysteresis)
+        Temperature stillCoolingTemp = Temperature.ofCelsius(64.0);
+        Power baseSurplus = Power.ofWatts(2000);
+        BatteryStatus batteryStatus = createBatteryStatus(70);
+
+        when(heatingRodService.readTemperature1()).thenReturn(stillCoolingTemp);
+        when(heatingRodService.readPower()).thenReturn(Power.ofWatts(0));
+        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+
+        // When
+        heatingControlService.controlHeating();
+
+        // Then - should NOT heat (still above 63°C restart threshold)
+        verify(heatingRodService, never()).adjustHeating(argThat(power -> power.getWatts() > 0));
+
+        // Now temperature drops to 62°C (below restart threshold of 63°C)
+        Temperature restartTemp = Temperature.ofCelsius(62.0);
+        when(heatingRodService.readTemperature1()).thenReturn(restartTemp);
+
+        // When
+        heatingControlService.controlHeating();
+
+        // Then - should resume heating
+        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 2000));
+    }
+
     // Helper method to create BatteryStatus with specific SOC
     private BatteryStatus createBatteryStatus(int socPercent) {
         return BatteryStatus.builder()
