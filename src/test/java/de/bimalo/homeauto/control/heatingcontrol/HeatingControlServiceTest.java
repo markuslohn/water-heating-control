@@ -1,7 +1,6 @@
 package de.bimalo.homeauto.control.heatingcontrol;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -305,15 +304,36 @@ class HeatingControlServiceTest {
     }
 
     @Test
-    void testControlHeating_WhenPowerFromBattery_ShouldCalculateCorrectly() {
+    void testControlHeating_WhenBatteryDischarging_ShouldStopHeating() {
+        // Given: Battery is discharging, grid is supplying power
+        // PV: 677W, Consumption: 3590W, Battery discharge: 1644W, Grid: 1269W
+        Temperature currentTemp = Temperature.ofCelsius(50.0);
+        Temperature targetTemp = Temperature.ofCelsius(68.0);
+        Power baseSurplus = Power.ofWatts(0); // PV - Consumption = negative, so 0
+        Power currentHeatingPower = Power.ofWatts(1000); // Currently heating
+        BatteryStatus batteryStatus = BatteryStatus.builder()
+                .timestamp(LocalDateTime.now())
+                .productionPower(Power.ofWatts(677))
+                .consumptionPower(Power.ofWatts(3590))
+                .batteryPower(Power.ofWatts(-1644)) // Discharging (negative)
+                .gridPower(Power.ofWatts(1269)) // Grid supplying power
+                .batteryStateOfCharge(Percentage.of(70))
+                .build();
 
-        Power productionPower = Power.ofWatts(800);
-        Power houseConsumptionPower = Power.ofWatts(2300);
-        Power batteryPower = Power.ofWatts(-1300);
+        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
+        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
+        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
+        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
 
-        Power surplusPower = productionPower.subtract(houseConsumptionPower).subtract(batteryPower);
-        assertNotNull(surplusPower);
+        // When
+        heatingControlService.controlHeating();
 
+        // Then
+        // adjustedSurplus = 0 + 1000 = 1000W
+        // Battery discharging: 1000 - 1644 = -644W (capped to 0)
+        // 0W < minimum 100W, so heating should stop
+        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 0));
     }
 
     // ==================== Battery Priority Tests ====================
@@ -545,8 +565,7 @@ class HeatingControlServiceTest {
         when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
         when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
         when(config.batteryPriorityEnabled()).thenReturn(true);
-        when(config.batteryPriorityThreshold()).thenReturn(60);
-        // batteryReservedPower not mocked - not used when override is active
+        // batteryPriorityThreshold and batteryReservedPower not mocked - not used when override is active
 
         // When
         heatingControlService.setBatteryPriorityOverride(true); // Disable battery priority

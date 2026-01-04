@@ -2,6 +2,7 @@ package de.bimalo.homeauto.control.heatingcontrol;
 
 import de.bimalo.homeauto.control.battery.BatteryStorageService;
 import de.bimalo.homeauto.control.heatingrod.HeatingRodService;
+import de.bimalo.homeauto.entity.BatteryStatus;
 import de.bimalo.homeauto.entity.Power;
 import de.bimalo.homeauto.entity.Temperature;
 import io.quarkus.scheduler.Scheduled;
@@ -27,7 +28,8 @@ public class HeatingControlService {
     private volatile boolean batteryPriorityRuntimeOverride = false;
     private volatile LocalDate overrideDate = null;
 
-    // Temperature hysteresis state: true when target reached and waiting for temperature to drop
+    // Temperature hysteresis state: true when target reached and waiting for
+    // temperature to drop
     private volatile boolean targetReachedCoolingMode = false;
 
     @Inject
@@ -117,7 +119,8 @@ public class HeatingControlService {
      * drops below (target - hysteresis).
      *
      * @param tempCheck the temperature check result
-     * @return true if heating is allowed, false if blocked by hysteresis or target reached
+     * @return true if heating is allowed, false if blocked by hysteresis or target
+     *         reached
      */
     private boolean handleTemperatureHysteresis(TemperatureCheck tempCheck) {
         double hysteresis = config.temperatureHysteresis();
@@ -166,7 +169,8 @@ public class HeatingControlService {
      * Checks the available solar power surplus.
      * Adjusts the surplus by adding the current heating rod power, as it is already
      * included in the house consumption measurement.
-     * If battery SOC is below threshold and battery priority is enabled (both config and runtime),
+     * If battery SOC is below threshold and battery priority is enabled (both
+     * config and runtime),
      * reserves power for battery charging.
      *
      * @return Power object representing the adjusted surplus power available for
@@ -175,40 +179,46 @@ public class HeatingControlService {
     private Power checkSurplusPower() {
         Power baseSurplus = batteryStorageService.determineSolarPowerSurplus();
         Power currentHeatingPower = heatingRodService.readPower();
-        Power batteryPower = batteryStorageService.getCurrentStatus().getBatteryPower();
+        BatteryStatus batteryStatus = batteryStorageService.getCurrentStatus();
+        Power batteryPower = batteryStatus.getBatteryPower();
+        int currentSoc = batteryStatus.getBatteryStateOfCharge().getValue();
 
         // Add current heating power back to surplus (it's already included in house
         // consumption)
         long adjustedSurplus = baseSurplus.getWatts() + currentHeatingPower.getWatts();
 
-        // Check if battery priority is active (both config and runtime override must be enabled)
         boolean batteryPriorityActive = config.batteryPriorityEnabled() && !batteryPriorityRuntimeOverride;
-        int currentSoc = batteryStorageService.getCurrentStatus().getBatteryStateOfCharge().getValue();
-        long availableForHeating = adjustedSurplus;
-
-        // If battery priority is DISABLED and battery is charging, add that power back
-        // (heating has priority over battery charging)
-        if (!batteryPriorityActive && batteryPower.isPositive()) {
-            availableForHeating += batteryPower.getWatts();
-            log.debug("Battery priority disabled: Adding battery charging power {} W to available heating power",
-                    batteryPower.getWatts());
-        }
+        long availableForHeating;
 
         if (batteryPriorityActive && currentSoc < config.batteryPriorityThreshold()) {
-            // Reserve power for battery charging
-            availableForHeating = adjustedSurplus - config.batteryReservedPower();
+            // === Battery Priority Mode ===
+            // Reserve power for battery, account for discharge
+            availableForHeating = adjustedSurplus;
 
-            log.info("Battery priority active (SOC: {}% < {}%): Reserving {} W for battery, {} W available for heating",
-                    currentSoc, config.batteryPriorityThreshold(),
-                    config.batteryReservedPower(), Math.max(0, availableForHeating));
-        } else {
-            if (!batteryPriorityActive && currentSoc < config.batteryPriorityThreshold()) {
-                log.info("Battery priority DISABLED (override active) - Solar surplus: {} W, Battery SOC: {}%",
-                        adjustedSurplus, currentSoc);
-            } else {
-                log.info("Solar surplus: {} W (base: {} W + current heating: {} W), Battery SOC: {}%",
-                        adjustedSurplus, baseSurplus.getWatts(), currentHeatingPower.getWatts(), currentSoc);
+            // If battery is discharging, reduce available power (insufficient solar)
+            if (batteryPower.isNegative()) {
+                availableForHeating += batteryPower.getWatts(); // batteryPower is negative, so this subtracts
             }
+
+            // Reserve power for battery charging
+            availableForHeating -= config.batteryReservedPower();
+
+            log.info(
+                    "Battery priority active (SOC: {}% < {}%): Adjusted {} W, battery {} W, reserved {} W → {} W available",
+                    currentSoc, config.batteryPriorityThreshold(),
+                    adjustedSurplus, batteryPower.getWatts(), config.batteryReservedPower(),
+                    Math.max(0, availableForHeating));
+        } else {
+            // === Heating Priority Mode ===
+            availableForHeating = adjustedSurplus;
+
+            // calculate available power including battery contribution
+            availableForHeating += batteryPower.getWatts();
+
+            log.info(
+                    "Heating priority mode: Adjusted {} W (base {} W + heating {} W), battery {} W, SOC {}% → {} W available",
+                    adjustedSurplus, baseSurplus.getWatts(), currentHeatingPower.getWatts(),
+                    batteryPower.getWatts(), currentSoc, Math.max(0, availableForHeating));
         }
 
         // Ensure we don't return negative values
@@ -258,7 +268,8 @@ public class HeatingControlService {
     }
 
     /**
-     * Gets the current state of battery priority (considering both config and runtime override).
+     * Gets the current state of battery priority (considering both config and
+     * runtime override).
      *
      * @return true if battery priority is active, false if disabled
      */
