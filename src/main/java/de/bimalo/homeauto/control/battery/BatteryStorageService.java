@@ -4,15 +4,20 @@ import de.bimalo.homeauto.boundary.e3dc.E3dcModbusClient;
 import de.bimalo.homeauto.entity.BatteryStatus;
 import de.bimalo.homeauto.entity.Percentage;
 import de.bimalo.homeauto.entity.Power;
+import io.smallrye.faulttolerance.api.CircuitBreakerName;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
+import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
+import org.eclipse.microprofile.faulttolerance.Fallback;
+import org.eclipse.microprofile.faulttolerance.Timeout;
 
 /**
  * Service class for the E3/DC battery storage in Simple Mode.
  * Provides access to key performance data of the battery storage.
+ * Implements Circuit Breaker pattern to handle Modbus communication failures.
  */
 @Slf4j
 @ApplicationScoped
@@ -20,6 +25,13 @@ public class BatteryStorageService {
 
     private final E3dcModbusClient modbusClient;
     private final BatteryStorageConfig config;
+
+    // Cached values for fallback when circuit is open
+    private volatile Power lastKnownGridPower = Power.ofWatts(0);
+    private volatile Power lastKnownBatteryPower = Power.ofWatts(0);
+    private volatile Power lastKnownProductionPower = Power.ofWatts(0);
+    private volatile Power lastKnownConsumptionPower = Power.ofWatts(1000);
+    private volatile Percentage lastKnownBatteryStateOfCharge = Percentage.of(50);
 
     @Inject
     public BatteryStorageService(BatteryStorageConfig config) {
@@ -75,29 +87,109 @@ public class BatteryStorageService {
         }
     }
 
-    private Power readGridPower() {
+    @CircuitBreaker(
+            requestVolumeThreshold = 4,
+            failureRatio = 0.5,
+            delay = 5000,
+            successThreshold = 2)
+    @Timeout(value = 3000)
+    @Fallback(fallbackMethod = "readGridPowerFallback")
+    @CircuitBreakerName("e3dc-grid-power")
+    Power readGridPower() {
         long rawValue = modbusClient.readGridPower();
-        return Power.ofWatts(rawValue);
+        Power result = Power.ofWatts(rawValue);
+        lastKnownGridPower = result;
+        return result;
     }
 
-    private Power readBatteryPower() {
+    Power readGridPowerFallback() {
+        log.warn("Circuit breaker open for grid power read, returning last known value: {} W",
+                lastKnownGridPower.getWatts());
+        return lastKnownGridPower;
+    }
+
+    @CircuitBreaker(
+            requestVolumeThreshold = 4,
+            failureRatio = 0.5,
+            delay = 5000,
+            successThreshold = 2)
+    @Timeout(value = 3000)
+    @Fallback(fallbackMethod = "readBatteryPowerFallback")
+    @CircuitBreakerName("e3dc-battery-power")
+    Power readBatteryPower() {
         long rawValue = modbusClient.readBatteryPower();
-        return Power.ofWatts(rawValue);
+        Power result = Power.ofWatts(rawValue);
+        lastKnownBatteryPower = result;
+        return result;
     }
 
-    private Power readProductionPower() {
+    Power readBatteryPowerFallback() {
+        log.warn("Circuit breaker open for battery power read, returning last known value: {} W",
+                lastKnownBatteryPower.getWatts());
+        return lastKnownBatteryPower;
+    }
+
+    @CircuitBreaker(
+            requestVolumeThreshold = 4,
+            failureRatio = 0.5,
+            delay = 5000,
+            successThreshold = 2)
+    @Timeout(value = 3000)
+    @Fallback(fallbackMethod = "readProductionPowerFallback")
+    @CircuitBreakerName("e3dc-production-power")
+    Power readProductionPower() {
         long rawValue = modbusClient.readProductionPower();
-        return Power.ofWatts(rawValue);
+        Power result = Power.ofWatts(rawValue);
+        lastKnownProductionPower = result;
+        return result;
     }
 
-    private Power readHouseConsumptionPower() {
+    Power readProductionPowerFallback() {
+        log.warn("Circuit breaker open for production power read, returning last known value: {} W",
+                lastKnownProductionPower.getWatts());
+        return lastKnownProductionPower;
+    }
+
+    @CircuitBreaker(
+            requestVolumeThreshold = 4,
+            failureRatio = 0.5,
+            delay = 5000,
+            successThreshold = 2)
+    @Timeout(value = 3000)
+    @Fallback(fallbackMethod = "readHouseConsumptionPowerFallback")
+    @CircuitBreakerName("e3dc-consumption-power")
+    Power readHouseConsumptionPower() {
         long rawValue = modbusClient.readHouseConsumptionPower();
-        return Power.ofWatts(rawValue);
+        Power result = Power.ofWatts(rawValue);
+        lastKnownConsumptionPower = result;
+        return result;
     }
 
-    private Percentage readBatteryStateOfCharge() {
+    Power readHouseConsumptionPowerFallback() {
+        log.warn("Circuit breaker open for consumption power read, returning last known value: {} W",
+                lastKnownConsumptionPower.getWatts());
+        return lastKnownConsumptionPower;
+    }
+
+    @CircuitBreaker(
+            requestVolumeThreshold = 4,
+            failureRatio = 0.5,
+            delay = 5000,
+            successThreshold = 2)
+    @Timeout(value = 3000)
+    @Fallback(fallbackMethod = "readBatteryStateOfChargeFallback")
+    @CircuitBreakerName("e3dc-battery-soc")
+    Percentage readBatteryStateOfCharge() {
         int rawValue = modbusClient.readBatteryStateOfCharge();
-        return Percentage.of(rawValue);
+        Percentage result = Percentage.of(rawValue);
+        lastKnownBatteryStateOfCharge = result;
+        return result;
+    }
+
+    Percentage readBatteryStateOfChargeFallback() {
+        log.warn("Circuit breaker open for battery SOC read, returning last known value: {}%",
+                lastKnownBatteryStateOfCharge.getValue());
+        return lastKnownBatteryStateOfCharge;
     }
 
 }

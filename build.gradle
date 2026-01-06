@@ -18,6 +18,7 @@ dependencies {
     implementation 'io.quarkus:quarkus-hibernate-validator'
     implementation 'io.quarkus:quarkus-config-yaml'
     implementation 'io.quarkus:quarkus-scheduler'
+    implementation 'io.quarkus:quarkus-smallrye-fault-tolerance'
 
     // Logging Adapter
     implementation 'org.jboss.slf4j:slf4j-jboss-logmanager'
