@@ -47,11 +47,50 @@ public class HeatingControlService {
     }
 
     /**
-     * Periodically checks solar surplus and temperature to control the heating rod.
-     * The interval is configurable via heatingctl.schedule-interval.
+     * Winter schedule: Runs during winter months (Nov-Feb) within configured hours.
+     * Configurable via heatingctl.winter-cron and heatingctl.winter-enabled.
      */
-    @Scheduled(every = "{heatingctl.schedule-interval}")
-    public void controlHeating() {
+    @Scheduled(cron = "{heatingctl.winter-cron}", skipExecutionIf = WinterDisabledPredicate.class)
+    public void controlHeatingWinter() {
+        log.debug("Winter schedule triggered");
+        controlHeatingInternal();
+    }
+
+    /**
+     * Spring schedule: Runs during spring months (Mar-Apr) within configured hours.
+     * Configurable via heatingctl.spring-cron and heatingctl.spring-enabled.
+     */
+    @Scheduled(cron = "{heatingctl.spring-cron}", skipExecutionIf = SpringDisabledPredicate.class)
+    public void controlHeatingSpring() {
+        log.debug("Spring schedule triggered");
+        controlHeatingInternal();
+    }
+
+    /**
+     * Autumn schedule: Runs during autumn months (Sep-Oct) within configured hours.
+     * Configurable via heatingctl.autumn-cron and heatingctl.autumn-enabled.
+     */
+    @Scheduled(cron = "{heatingctl.autumn-cron}", skipExecutionIf = AutumnDisabledPredicate.class)
+    public void controlHeatingAutumn() {
+        log.debug("Autumn schedule triggered");
+        controlHeatingInternal();
+    }
+
+    /**
+     * Summer schedule: Runs during summer months (May-Aug) within configured hours.
+     * Configurable via heatingctl.summer-cron and heatingctl.summer-enabled.
+     */
+    @Scheduled(cron = "{heatingctl.summer-cron}", skipExecutionIf = SummerDisabledPredicate.class)
+    public void controlHeatingSummer() {
+        log.debug("Summer schedule triggered");
+        controlHeatingInternal();
+    }
+
+    /**
+     * Internal heating control logic called by seasonal schedulers.
+     * Checks solar surplus and temperature to control the heating rod.
+     */
+    private void controlHeatingInternal() {
         if (!shouldControlHeating()) {
             return;
         }

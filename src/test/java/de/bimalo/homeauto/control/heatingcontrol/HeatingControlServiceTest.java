@@ -60,7 +60,7 @@ class HeatingControlServiceTest {
         when(config.enabled()).thenReturn(false);
 
         // When
-        heatingControlService.controlHeating();
+        heatingControlService.controlHeatingSummer();
 
         // Then
         verify(heatingRodService, never()).readTemperature1();
@@ -79,7 +79,7 @@ class HeatingControlServiceTest {
         when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
 
         // When
-        heatingControlService.controlHeating();
+        heatingControlService.controlHeatingSummer();
 
         // Then
         verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 0));
@@ -97,7 +97,7 @@ class HeatingControlServiceTest {
         when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
 
         // When
-        heatingControlService.controlHeating();
+        heatingControlService.controlHeatingSummer();
 
         // Then
         verify(heatingRodService, never()).adjustHeating(any());
@@ -119,7 +119,7 @@ class HeatingControlServiceTest {
         when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
 
         // When
-        heatingControlService.controlHeating();
+        heatingControlService.controlHeatingSummer();
 
         // Then
         // Total surplus = 50 + 200 = 250W, but this is still checked against minimum
@@ -144,7 +144,7 @@ class HeatingControlServiceTest {
         when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
 
         // When
-        heatingControlService.controlHeating();
+        heatingControlService.controlHeatingSummer();
 
         // Then
         // Total surplus = -200 + 150 = -50W, below minimum of 100W
@@ -167,7 +167,7 @@ class HeatingControlServiceTest {
         when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
 
         // When
-        heatingControlService.controlHeating();
+        heatingControlService.controlHeatingSummer();
 
         // Then
         // Total surplus = 1500 + 200 = 1700W
@@ -190,7 +190,7 @@ class HeatingControlServiceTest {
         when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
 
         // When
-        heatingControlService.controlHeating();
+        heatingControlService.controlHeatingSummer();
 
         // Then
         // Total surplus = 3500 + 200 = 3700W, limited to 3000W
@@ -213,7 +213,7 @@ class HeatingControlServiceTest {
         when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
 
         // When
-        heatingControlService.controlHeating();
+        heatingControlService.controlHeatingSummer();
 
         // Then
         // Total surplus = 2800 + 200 = 3000W, exactly at maximum
@@ -236,7 +236,7 @@ class HeatingControlServiceTest {
         when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
 
         // When
-        heatingControlService.controlHeating();
+        heatingControlService.controlHeatingSummer();
 
         // Then
         // Total surplus = 1200 + 0 = 1200W
@@ -250,7 +250,7 @@ class HeatingControlServiceTest {
                 .thenThrow(new ModbusReadException("Modbus communication error", "localhost", 502, 10001, null));
 
         // When
-        heatingControlService.controlHeating();
+        heatingControlService.controlHeatingSummer();
 
         // Then
         // Should not throw exception, just log it
@@ -273,7 +273,7 @@ class HeatingControlServiceTest {
         when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
 
         // When
-        heatingControlService.controlHeating();
+        heatingControlService.controlHeatingSummer();
 
         // Then
         // Total surplus = 50 + 50 = 100W, exactly at minimum
@@ -296,7 +296,7 @@ class HeatingControlServiceTest {
         when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
 
         // When
-        heatingControlService.controlHeating();
+        heatingControlService.controlHeatingSummer();
 
         // Then
         // Total surplus = 49 + 50 = 99W, just below minimum of 100W
@@ -327,7 +327,7 @@ class HeatingControlServiceTest {
         when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
 
         // When
-        heatingControlService.controlHeating();
+        heatingControlService.controlHeatingSummer();
 
         // Then
         // adjustedSurplus = 0 + 1000 = 1000W
@@ -357,7 +357,7 @@ class HeatingControlServiceTest {
         when(config.batteryReservedPower()).thenReturn(1000);
 
         // When
-        heatingControlService.controlHeating();
+        heatingControlService.controlHeatingSummer();
 
         // Then
         // Adjusted surplus = 2000 + 0 = 2000W
@@ -383,7 +383,7 @@ class HeatingControlServiceTest {
         when(config.batteryPriorityThreshold()).thenReturn(60);
 
         // When
-        heatingControlService.controlHeating();
+        heatingControlService.controlHeatingSummer();
 
         // Then
         // Battery priority not active (SOC above threshold): full 2000W available for
@@ -408,7 +408,7 @@ class HeatingControlServiceTest {
         when(config.batteryPriorityEnabled()).thenReturn(false); // Disabled in config
 
         // When
-        heatingControlService.controlHeating();
+        heatingControlService.controlHeatingSummer();
 
         // Then
         // Battery priority disabled: full 2000W available despite low SOC
@@ -434,7 +434,7 @@ class HeatingControlServiceTest {
         when(config.batteryReservedPower()).thenReturn(1000);
 
         // When
-        heatingControlService.controlHeating();
+        heatingControlService.controlHeatingSummer();
 
         // Then
         // Adjusted surplus = 800 + 0 = 800W
@@ -462,7 +462,7 @@ class HeatingControlServiceTest {
         when(config.batteryReservedPower()).thenReturn(1000);
 
         // When
-        heatingControlService.controlHeating();
+        heatingControlService.controlHeatingSummer();
 
         // Then
         // Adjusted surplus = 1500 + 500 = 2000W
@@ -488,7 +488,7 @@ class HeatingControlServiceTest {
         when(config.batteryPriorityThreshold()).thenReturn(60);
 
         // When
-        heatingControlService.controlHeating();
+        heatingControlService.controlHeatingSummer();
 
         // Then
         // SOC equals threshold, priority not active: full 2000W available
@@ -514,7 +514,7 @@ class HeatingControlServiceTest {
         when(config.batteryReservedPower()).thenReturn(1000);
 
         // When
-        heatingControlService.controlHeating();
+        heatingControlService.controlHeatingSummer();
 
         // Then
         // SOC just below threshold, priority active: 2000 - 1000 = 1000W
@@ -541,7 +541,7 @@ class HeatingControlServiceTest {
         when(config.maxHeatingPower()).thenReturn(3000);
 
         // When
-        heatingControlService.controlHeating();
+        heatingControlService.controlHeatingSummer();
 
         // Then
         // Adjusted surplus = 5000 + 0 = 5000W
@@ -569,7 +569,7 @@ class HeatingControlServiceTest {
 
         // When
         heatingControlService.setBatteryPriorityOverride(true); // Disable battery priority
-        heatingControlService.controlHeating();
+        heatingControlService.controlHeatingSummer();
 
         // Then
         // Override active, battery priority ignored: full 2000W available
@@ -596,7 +596,7 @@ class HeatingControlServiceTest {
 
         // When
         heatingControlService.setBatteryPriorityOverride(false); // Enable battery priority
-        heatingControlService.controlHeating();
+        heatingControlService.controlHeatingSummer();
 
         // Then
         // Override not active, battery priority applies: 2000 - 1000 = 1000W
@@ -669,7 +669,7 @@ class HeatingControlServiceTest {
         when(config.temperatureHysteresis()).thenReturn(10.0);
 
         // When
-        heatingControlService.controlHeating();
+        heatingControlService.controlHeatingSummer();
 
         // Then
         verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 0));
@@ -685,7 +685,7 @@ class HeatingControlServiceTest {
         when(heatingRodService.readPower()).thenReturn(Power.ofWatts(500));
         when(config.temperatureHysteresis()).thenReturn(10.0);
 
-        heatingControlService.controlHeating(); // Enter cooling mode
+        heatingControlService.controlHeatingSummer(); // Enter cooling mode
 
         // Now temperature drops to 60°C (still above restart threshold of 58°C)
         Temperature coolingTemp = Temperature.ofCelsius(60.0);
@@ -693,7 +693,7 @@ class HeatingControlServiceTest {
         when(heatingRodService.readTemperature1()).thenReturn(coolingTemp);
 
         // When
-        heatingControlService.controlHeating();
+        heatingControlService.controlHeatingSummer();
 
         // Then - should NOT heat (still in cooling mode)
         // Only the first call (entering cooling mode) should have called adjustHeating
@@ -710,7 +710,7 @@ class HeatingControlServiceTest {
         when(heatingRodService.readPower()).thenReturn(Power.ofWatts(500));
         when(config.temperatureHysteresis()).thenReturn(10.0);
 
-        heatingControlService.controlHeating(); // Enter cooling mode
+        heatingControlService.controlHeatingSummer(); // Enter cooling mode
 
         // Now temperature drops to 57°C (below restart threshold of 58°C)
         Temperature restartTemp = Temperature.ofCelsius(57.0);
@@ -723,7 +723,7 @@ class HeatingControlServiceTest {
         when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
 
         // When
-        heatingControlService.controlHeating();
+        heatingControlService.controlHeatingSummer();
 
         // Then - should resume heating
         verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 2000));
@@ -746,7 +746,7 @@ class HeatingControlServiceTest {
         when(config.temperatureHysteresis()).thenReturn(10.0);
 
         // When
-        heatingControlService.controlHeating();
+        heatingControlService.controlHeatingSummer();
 
         // Then - should heat normally
         verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 1500));
@@ -762,7 +762,7 @@ class HeatingControlServiceTest {
         when(heatingRodService.readPower()).thenReturn(Power.ofWatts(500));
         when(config.temperatureHysteresis()).thenReturn(5.0); // 5°C hysteresis
 
-        heatingControlService.controlHeating(); // Enter cooling mode
+        heatingControlService.controlHeatingSummer(); // Enter cooling mode
 
         // Temperature at 64°C (above restart threshold of 63°C with 5°C hysteresis)
         Temperature stillCoolingTemp = Temperature.ofCelsius(64.0);
@@ -775,7 +775,7 @@ class HeatingControlServiceTest {
         when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
 
         // When
-        heatingControlService.controlHeating();
+        heatingControlService.controlHeatingSummer();
 
         // Then - should NOT heat (still above 63°C restart threshold)
         verify(heatingRodService, never()).adjustHeating(argThat(power -> power.getWatts() > 0));
@@ -785,7 +785,7 @@ class HeatingControlServiceTest {
         when(heatingRodService.readTemperature1()).thenReturn(restartTemp);
 
         // When
-        heatingControlService.controlHeating();
+        heatingControlService.controlHeatingSummer();
 
         // Then - should resume heating
         verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 2000));

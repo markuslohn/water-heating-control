@@ -76,4 +76,58 @@ public interface HeatingControlConfig {
     @Min(0)
     @WithDefault("10.0")
     double temperatureHysteresis();
+
+    // ========== Seasonal Operating Hours ==========
+
+    /**
+     * Enable winter schedule (Nov-Feb).
+     */
+    @WithDefault("true")
+    boolean winterEnabled();
+
+    /**
+     * Cron expression for winter schedule (Nov-Feb).
+     * Default: Every 40 seconds, 09:00-15:59, Nov/Dec/Jan/Feb
+     */
+    @WithDefault("*/40 * 9-15 * 11,12,1,2 ?")
+    String winterCron();
+
+    /**
+     * Enable spring schedule (Mar-Apr).
+     */
+    @WithDefault("true")
+    boolean springEnabled();
+
+    /**
+     * Cron expression for spring schedule (Mar-Apr).
+     * Default: Every 40 seconds, 08:00-17:59, Mar/Apr
+     */
+    @WithDefault("*/40 * 8-17 * 3,4 ?")
+    String springCron();
+
+    /**
+     * Enable autumn schedule (Sep-Oct).
+     */
+    @WithDefault("true")
+    boolean autumnEnabled();
+
+    /**
+     * Cron expression for autumn schedule (Sep-Oct).
+     * Default: Every 40 seconds, 08:00-17:59, Sep/Oct
+     */
+    @WithDefault("*/40 * 8-17 * 9,10 ?")
+    String autumnCron();
+
+    /**
+     * Enable summer schedule (May-Aug).
+     */
+    @WithDefault("true")
+    boolean summerEnabled();
+
+    /**
+     * Cron expression for summer schedule (May-Aug).
+     * Default: Every 40 seconds, 07:00-19:59, May-Aug
+     */
+    @WithDefault("*/40 * 7-19 * 5-8 ?")
+    String summerCron();
 }

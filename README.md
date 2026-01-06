@@ -105,6 +105,71 @@ heatingctl.temperature-hysteresis=10.0
 - Override automatically resets at midnight
 - Useful for days when you know the battery won't reach full charge
 
+### Seasonal Operating Hours
+
+The application automatically adjusts heating control schedules based on the season and daylight hours. This ensures optimal solar surplus utilization and prevents unnecessary operation during low-production periods.
+
+```properties
+# Winter Schedule (November - February): 09:00 - 16:00
+heatingctl.winter-enabled=true
+heatingctl.winter-cron=*/40 * 9-15 * 11,12,1,2 ?
+
+# Spring Schedule (March - April): 08:00 - 18:00
+heatingctl.spring-enabled=true
+heatingctl.spring-cron=*/40 * 8-17 * 3,4 ?
+
+# Autumn Schedule (September - October): 08:00 - 18:00
+heatingctl.autumn-enabled=true
+heatingctl.autumn-cron=*/40 * 8-17 * 9,10 ?
+
+# Summer Schedule (May - August): 07:00 - 20:00
+heatingctl.summer-enabled=true
+heatingctl.summer-cron=*/40 * 7-19 * 5-8 ?
+```
+
+**How It Works:**
+- Each season has its own scheduler with dedicated operating hours
+- Scheduler runs **only** during configured months and hours
+- Default: Every 40 seconds during operating hours
+- Outside operating hours: **No scheduler activity** (saves resources)
+
+**Seasonal Defaults:**
+| Season | Months | Operating Hours | Interval |
+|--------|--------|----------------|----------|
+| Winter | Nov-Feb | 09:00-16:00 | 40 sec |
+| Spring | Mar-Apr | 08:00-18:00 | 40 sec |
+| Autumn | Sep-Oct | 08:00-18:00 | 40 sec |
+| Summer | May-Aug | 07:00-20:00 | 40 sec |
+
+**Customization Examples:**
+
+*Extend winter hours to 17:00:*
+```properties
+heatingctl.winter-cron=*/40 * 9-16 * 11,12,1,2 ?
+```
+
+*Change summer interval to 30 seconds:*
+```properties
+heatingctl.summer-cron=*/30 * 7-19 * 5-8 ?
+```
+
+*Disable spring schedule entirely:*
+```properties
+heatingctl.spring-enabled=false
+```
+
+*Run only at full minutes (instead of every 40 sec):*
+```properties
+heatingctl.winter-cron=0 * 9-15 * 11,12,1,2 ?
+```
+
+**Benefits:**
+- ✅ Optimized for seasonal solar production patterns
+- ✅ Reduced system load outside peak solar hours
+- ✅ No unnecessary Modbus communication at night/early morning
+- ✅ Fully configurable via properties file
+- ✅ Individual seasons can be enabled/disabled
+
 ### Quarkus Scheduler Settings
 
 ```properties
@@ -176,20 +241,32 @@ Access at `http://localhost:8080/q/health`
 
 ### Key Components
 
-- **HeatingControlService**: Main scheduler that runs every minute to check and adjust heating
+- **HeatingControlService**: Seasonal schedulers that check and adjust heating based on time of year
 - **HeatingRodService**: Interface to the ELWA2 heating rod (Modbus communication)
 - **BatteryStorageService**: Interface to the E3/DC battery storage (Modbus communication)
 - **REST Resources**: Web API for monitoring and manual control
 - **Web UI**: Responsive single-page application for user interface
+- **Seasonal Predicates**: Control which seasons are active (WinterDisabledPredicate, etc.)
 
 ### Control Logic
 
-1. **Every minute**, the scheduler checks:
+1. **Seasonal Scheduling** (resource optimization):
+   - Four independent schedulers (Winter, Spring, Autumn, Summer)
+   - Each runs **only** during configured months and hours:
+     - Winter (Nov-Feb): Default 09:00-16:00
+     - Spring (Mar-Apr): Default 08:00-18:00
+     - Autumn (Sep-Oct): Default 08:00-18:00
+     - Summer (May-Aug): Default 07:00-20:00
+   - Outside operating hours: **No activity** (saves CPU, network, power)
+   - Fully configurable via Cron expressions
+   - Individual seasons can be enabled/disabled
+
+2. **On each schedule trigger**, the application checks:
    - Current battery state and available solar surplus
    - Current and target temperatures of the heating rod
    - Whether heating should be active
 
-2. **Battery Priority** (optimization feature):
+3. **Battery Priority** (optimization feature):
    - If battery priority is enabled (config + not overridden):
      - If battery SOC < configured threshold (default: 60%)
        - Reserves power for battery charging (default: 1000W)
@@ -200,7 +277,7 @@ Access at `http://localhost:8080/q/health`
      - Temporarily disables battery priority until midnight
      - Auto-resets at 00:00
 
-3. **Temperature Hysteresis** (prevents on/off cycling):
+4. **Temperature Hysteresis** (prevents on/off cycling):
    - When target temperature is reached (e.g., 68°C):
      - Heating stops and enters "cooling mode"
      - Heating remains off even if surplus is available
@@ -209,7 +286,7 @@ Access at `http://localhost:8080/q/health`
      - Prevents frequent on/off cycling near target temperature
    - Configurable hysteresis value (default: 10°C)
 
-4. **Surplus Power Calculation**:
+5. **Surplus Power Calculation**:
    - When battery priority is **ENABLED**:
      - Heating uses: Production - Consumption - Battery Charging
      - If battery charging: Reserved power is subtracted
@@ -217,12 +294,12 @@ Access at `http://localhost:8080/q/health`
      - Heating uses: Production - Consumption
      - Battery charging power is added back (heating has priority)
 
-5. **Decision making**:
+6. **Decision making**:
    - If in cooling mode and temperature > restart threshold → keep heating off
    - If surplus power < minimum threshold → stop heating
    - If surplus power available → adjust heating power to match surplus (up to maximum)
 
-6. **Power adjustment**:
+7. **Power adjustment**:
    - Automatically accounts for current heating power in surplus calculation
    - Respects configured maximum power limit
    - Prioritizes battery charging when SOC is low
