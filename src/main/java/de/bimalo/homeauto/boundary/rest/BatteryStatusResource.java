@@ -67,11 +67,18 @@ public class BatteryStatusResource {
     public Response setBatteryPriority(@QueryParam("disabled") boolean disabled) {
         log.info("REST: Battery priority override requested: disabled={}", disabled);
 
-        heatingControlService.setBatteryPriorityOverride(disabled);
-        boolean active = heatingControlService.isBatteryPriorityActive();
+        try {
+            heatingControlService.setBatteryPriorityOverride(disabled);
+            boolean active = heatingControlService.isBatteryPriorityActive();
 
-        return Response.ok()
-                .entity(String.format("Battery priority is now %s", active ? "ACTIVE" : "DISABLED"))
-                .build();
+            return Response.ok()
+                    .entity(String.format("Battery priority is now %s", active ? "ACTIVE" : "DISABLED"))
+                    .build();
+        } catch (IllegalStateException e) {
+            log.error("REST: Failed to set battery priority override: {}", e.getMessage());
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(String.format("{\"error\": \"%s\"}", e.getMessage()))
+                    .build();
+        }
     }
 }
