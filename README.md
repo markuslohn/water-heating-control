@@ -222,6 +222,19 @@ quarkus.scheduler.start-mode=normal
 java -jar build/quarkus-app/quarkus-run.jar
 ```
 
+**Build and push to GitHub repository:**
+```bash
+./gradlew build \
+  -Dquarkus.container-image.build=true \
+  -Dquarkus.container-image.push=true \
+  -Dquarkus.container-image.registry=ghcr.io \
+  -Dquarkus.container-image.group=markuslohn \
+  -Dquarkus.container-image.name=hot-water-control \
+  -Dquarkus.container-image.tag=1.0.0 \
+  -Dquarkus.container-image.username=markuslohn \
+  -Dquarkus.container-image.password=XXXX
+```
+
 ### Development Tools
 
 **Quarkus Dev UI:**
