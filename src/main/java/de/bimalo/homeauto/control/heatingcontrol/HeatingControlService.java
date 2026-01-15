@@ -21,9 +21,6 @@ import lombok.extern.slf4j.Slf4j;
 @ApplicationScoped
 public class HeatingControlService {
 
-    private static final int ZERO_WATTS = 0;
-    private static final int MIN_POWER_WATTS = 0;
-
     private final HeatingControlConfig config;
     private final BatteryStorageService batteryStorageService;
     private final HeatingRodService heatingRodService;
@@ -96,7 +93,8 @@ public class HeatingControlService {
         }
 
         try {
-            // Read current heating power once per control cycle to avoid multiple service calls
+            // Read current heating power once per control cycle to avoid multiple service
+            // calls
             Power currentHeatingPower = heatingRodService.readPower();
             TemperatureCheck tempCheck = checkTemperature();
 
@@ -106,18 +104,18 @@ public class HeatingControlService {
             }
 
             Power surplusPower = checkSurplusPower(currentHeatingPower);
-            if (surplusPower.getWatts() < config.minSurplusPower()) {
+            if (surplusPower.isLessThan(config.minSurplusPower())) {
                 stopHeating(String.format("Surplus power %d W is below minimum %d W",
                         surplusPower.getWatts(), config.minSurplusPower()), currentHeatingPower);
                 return;
             }
 
             // Limit heating power to configured maximum
-            Power heatingPower = surplusPower.getWatts() > config.maxHeatingPower()
+            Power heatingPower = surplusPower.isGreaterThan(config.maxHeatingPower())
                     ? Power.ofWatts(config.maxHeatingPower())
                     : surplusPower;
 
-            if (heatingPower.getWatts() < surplusPower.getWatts()) {
+            if (heatingPower.isLessThan(surplusPower.getWatts())) {
                 log.debug("Limiting heating power from {} W to {} W (max configured)",
                         surplusPower.getWatts(), heatingPower.getWatts());
             }
@@ -161,7 +159,7 @@ public class HeatingControlService {
      * When target temperature is reached, heating only restarts when temperature
      * drops below (target - hysteresis).
      *
-     * @param tempCheck the temperature check result
+     * @param tempCheck           the temperature check result
      * @param currentHeatingPower the current heating power
      * @return true if heating is allowed, false if blocked by hysteresis or target
      *         reached
@@ -170,7 +168,8 @@ public class HeatingControlService {
         double hysteresis = config.temperatureHysteresis();
         double restartThreshold = tempCheck.targetCelsius() - hysteresis;
 
-        // Guard Clause: Exit cooling mode if temperature dropped below restart threshold
+        // Guard Clause: Exit cooling mode if temperature dropped below restart
+        // threshold
         if (targetReachedCoolingMode.get() && tempCheck.currentCelsius() < restartThreshold) {
             targetReachedCoolingMode.set(false);
             log.info("Temperature dropped to %.1f°C (below restart threshold %.1f°C), exiting cooling mode",
@@ -200,9 +199,9 @@ public class HeatingControlService {
      * Enters cooling mode when target temperature is reached.
      * Extracted to eliminate code duplication.
      *
-     * @param tempCheck the temperature check result
+     * @param tempCheck           the temperature check result
      * @param currentHeatingPower the current heating power
-     * @param restartThreshold the temperature threshold for restarting heating
+     * @param restartThreshold    the temperature threshold for restarting heating
      */
     private void enterCoolingMode(TemperatureCheck tempCheck, Power currentHeatingPower, double restartThreshold) {
         if (targetReachedCoolingMode.compareAndSet(false, true)) {
@@ -221,42 +220,60 @@ public class HeatingControlService {
      * config and runtime),
      * reserves power for battery charging.
      *
-     * @param currentHeatingPower the current heating power (cached from control cycle)
+     * @param currentHeatingPower the current heating power (cached from control
+     *                            cycle)
      * @return Power object representing the adjusted surplus power available for
      *         heating
      */
     private Power checkSurplusPower(Power currentHeatingPower) {
-        Power baseSurplus = batteryStorageService.determineSolarPowerSurplus();
         BatteryStatus batteryStatus = batteryStorageService.getCurrentStatus();
+        Power baseSurplus = batteryStorageService.determineSolarPowerSurplus();
+        PowerCalculationContext ctx = new PowerCalculationContext(batteryStatus, currentHeatingPower);
 
-        long adjustedSurplus = calculateAdjustedSurplus(baseSurplus, currentHeatingPower);
+        Power adjustedSurplus = calculateAdjustedSurplus(ctx);
         boolean batteryPriorityActive = config.batteryPriorityEnabled() && !batteryPriorityRuntimeOverride.get();
-        int currentSoc = batteryStatus.getBatteryStateOfCharge().getValue();
 
-        long availableForHeating;
-        if (batteryPriorityActive && currentSoc < config.batteryPriorityThreshold()) {
-            availableForHeating = calculateAvailablePowerBatteryPriority(
-                    adjustedSurplus, batteryStatus, currentSoc);
+        Power availableForHeating;
+        if (batteryPriorityActive && ctx.getBatterySoc().isLessThan(config.batteryPriorityThreshold())) {
+            availableForHeating = calculateAvailablePowerBatteryPriority(adjustedSurplus, ctx);
         } else {
-            availableForHeating = calculateAvailablePowerHeatingPriority(
-                    adjustedSurplus, baseSurplus, currentHeatingPower, batteryStatus, currentSoc);
+            availableForHeating = calculateAvailablePowerHeatingPriority(adjustedSurplus, baseSurplus, ctx);
         }
 
-        return Power.ofWatts(Math.max(MIN_POWER_WATTS, availableForHeating));
+        return availableForHeating.atLeast(Power.ZERO);
     }
 
     /**
-     * Calculates the adjusted surplus power by adding current heating power back.
+     * Calculates the adjusted surplus power available for heating.
      * The current heating power is already included in house consumption
      * measurement,
-     * so we need to add it back to get the real available surplus.
+     * so it is subtracted to get the real available surplus.
+     * Battery charging power is also considered as it reduces available surplus.
      *
-     * @param baseSurplus         the base solar power surplus
-     * @param currentHeatingPower the current heating rod power consumption
-     * @return adjusted surplus in watts
+     * @param ctx the power calculation context containing all relevant power values
+     * @return adjusted surplus power available for heating
      */
-    private long calculateAdjustedSurplus(Power baseSurplus, Power currentHeatingPower) {
-        return baseSurplus.getWatts() + currentHeatingPower.getWatts();
+    private Power calculateAdjustedSurplus(PowerCalculationContext ctx) {
+        Power adjustedConsumptionPower;
+        if (ctx.isHeatingActive()) {
+            log.debug(
+                    "Current heating power {} W is already included in house consumption measurement, adding back to surplus",
+                    ctx.getCurrentHeatingPower().getWatts());
+            adjustedConsumptionPower = ctx.getHouseConsumptionPower().reduce(ctx.getCurrentHeatingPower());
+        } else {
+            adjustedConsumptionPower = ctx.getHouseConsumptionPower();
+        }
+
+        // Base solar surplus: Production - Consumption
+        Power surplusPower = ctx.getProductionPower().reduce(adjustedConsumptionPower);
+
+        // If battery is charging, this solar power is not available for other use
+        if (ctx.isBatteryCharging()) {
+            surplusPower = surplusPower.reduce(ctx.getBatteryPower());
+        }
+        // If battery is discharging (negative), we ignore it - it's not solar power
+
+        return surplusPower.atLeast(Power.ZERO);
     }
 
     /**
@@ -264,28 +281,25 @@ public class HeatingControlService {
      * Reserves power for battery charging and accounts for battery discharge.
      *
      * @param adjustedSurplus the adjusted solar surplus
-     * @param batteryStatus   current battery status
-     * @param currentSoc      current battery state of charge
+     * @param ctx             the power calculation context
      * @return available power for heating in watts
      */
-    private long calculateAvailablePowerBatteryPriority(
-            long adjustedSurplus, BatteryStatus batteryStatus, int currentSoc) {
-        Power batteryPower = batteryStatus.getBatteryPower();
-        long availableForHeating = adjustedSurplus;
+    private Power calculateAvailablePowerBatteryPriority(Power adjustedSurplus, PowerCalculationContext ctx) {
+        Power availableForHeating = adjustedSurplus;
 
         // If battery is discharging, reduce available power (insufficient solar)
-        if (batteryPower.isNegative()) {
-            availableForHeating += batteryPower.getWatts(); // batteryPower is negative, so this subtracts
+        if (ctx.isBatteryDischarging()) {
+            availableForHeating = availableForHeating.reduce(ctx.getBatteryPower());
         }
 
         // Reserve power for battery charging
-        availableForHeating -= config.batteryReservedPower();
+        availableForHeating = availableForHeating.reduce(config.batteryReservedPower());
 
         log.info(
                 "Battery priority active (SOC: {}% < {}%): Adjusted {} W, battery {} W, reserved {} W → {} W available",
-                currentSoc, config.batteryPriorityThreshold(),
-                adjustedSurplus, batteryPower.getWatts(), config.batteryReservedPower(),
-                Math.max(MIN_POWER_WATTS, availableForHeating));
+                ctx.getBatterySoc(), config.batteryPriorityThreshold(),
+                adjustedSurplus, ctx.getBatteryPower().getWatts(), config.batteryReservedPower(),
+                availableForHeating.atLeast(Power.ZERO).getWatts());
 
         return availableForHeating;
     }
@@ -294,26 +308,22 @@ public class HeatingControlService {
      * Calculates available power for heating in heating priority mode.
      * Allows battery discharge to supplement heating power.
      *
-     * @param adjustedSurplus     the adjusted solar surplus
-     * @param baseSurplus         the base solar surplus (for logging)
-     * @param currentHeatingPower current heating power (for logging)
-     * @param batteryStatus       current battery status
-     * @param currentSoc          current battery state of charge
+     * @param adjustedSurplus the adjusted solar surplus
+     * @param baseSurplus     the base solar surplus before adjustments (for
+     *                        logging)
+     * @param ctx             the power calculation context
      * @return available power for heating in watts
      */
-    private long calculateAvailablePowerHeatingPriority(
-            long adjustedSurplus, Power baseSurplus, Power currentHeatingPower,
-            BatteryStatus batteryStatus, int currentSoc) {
-        Power batteryPower = batteryStatus.getBatteryPower();
-        long availableForHeating = adjustedSurplus;
-
+    private Power calculateAvailablePowerHeatingPriority(
+            Power adjustedSurplus, Power baseSurplus, PowerCalculationContext ctx) {
         // Calculate available power including battery contribution
-        availableForHeating += batteryPower.getWatts();
+        Power availableForHeating = adjustedSurplus.increase(ctx.getBatteryPower());
 
         log.info(
                 "Heating priority mode: Adjusted {} W (base {} W + heating {} W), battery {} W, SOC {}% → {} W available",
-                adjustedSurplus, baseSurplus.getWatts(), currentHeatingPower.getWatts(),
-                batteryPower.getWatts(), currentSoc, Math.max(MIN_POWER_WATTS, availableForHeating));
+                adjustedSurplus.getWatts(), baseSurplus.getWatts(), ctx.getCurrentHeatingPower().getWatts(),
+                ctx.getBatteryPower().getWatts(), ctx.getBatterySoc(),
+                availableForHeating.atLeast(Power.ZERO).getWatts());
 
         return availableForHeating;
     }
@@ -321,13 +331,14 @@ public class HeatingControlService {
     /**
      * Stops the heating and logs the reason.
      *
-     * @param reason the reason why heating is being stopped
-     * @param currentHeatingPower the current heating power (cached from control cycle)
+     * @param reason              the reason why heating is being stopped
+     * @param currentHeatingPower the current heating power (cached from control
+     *                            cycle)
      */
     private void stopHeating(String reason, Power currentHeatingPower) {
-        if (currentHeatingPower.getWatts() > ZERO_WATTS) {
+        if (currentHeatingPower.isPositive()) {
             log.info("Stopping heating: {}", reason);
-            heatingRodService.adjustHeating(Power.ofWatts(ZERO_WATTS));
+            heatingRodService.adjustHeating(Power.ZERO);
         }
     }
 
@@ -348,7 +359,8 @@ public class HeatingControlService {
      * When enabled, battery priority logic is temporarily disabled until midnight.
      *
      * @param disabled true to disable battery priority, false to enable it
-     * @throws IllegalStateException if battery priority is not enabled in configuration
+     * @throws IllegalStateException if battery priority is not enabled in
+     *                               configuration
      */
     public void setBatteryPriorityOverride(boolean disabled) {
         if (!config.batteryPriorityEnabled()) {

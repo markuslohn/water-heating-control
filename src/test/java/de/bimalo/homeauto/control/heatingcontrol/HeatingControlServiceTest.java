@@ -110,7 +110,10 @@ class HeatingControlServiceTest {
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         Power baseSurplus = Power.ofWatts(50); // Below minimum of 100W
         Power currentHeatingPower = Power.ofWatts(200);
-        BatteryStatus batteryStatus = createBatteryStatus(70); // SOC above threshold
+        // New logic: adjustedSurplus = production - (consumption - currentHeating)
+        // For 50W result: production=250, consumption=200 → 250 - (200-200) = 250W
+        // Then in heating priority: availableForHeating = 250 + 0 = 250W (above minimum)
+        BatteryStatus batteryStatus = createBatteryStatus(70, 250, 200, 0);
 
         when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
         when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
@@ -122,9 +125,8 @@ class HeatingControlServiceTest {
         heatingControlService.controlHeatingSummer();
 
         // Then
-        // Total surplus = 50 + 200 = 250W, but this is still checked against minimum
-        // Actually, the adjusted surplus is 250W which is above minimum, so it should
-        // heat
+        // adjustedSurplus = 250 - (200 - 200) = 250W, above minimum of 100W
+        // heating priority: availableForHeating = 250 + 0 = 250W
         verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 250));
     }
 
@@ -135,7 +137,10 @@ class HeatingControlServiceTest {
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         Power baseSurplus = Power.ofWatts(-200); // Negative surplus
         Power currentHeatingPower = Power.ofWatts(150); // Current heating
-        BatteryStatus batteryStatus = createBatteryStatus(70); // SOC above threshold
+        // New logic: adjustedSurplus = production - (consumption - currentHeating)
+        // For negative result: production=100, consumption=300 → 100 - (300-150) = -50W → capped to 0
+        // heating priority: availableForHeating = 0 + 0 = 0W < 100W → stop
+        BatteryStatus batteryStatus = createBatteryStatus(70, 100, 300, 0);
 
         when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
         when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
@@ -147,7 +152,7 @@ class HeatingControlServiceTest {
         heatingControlService.controlHeatingSummer();
 
         // Then
-        // Total surplus = -200 + 150 = -50W, below minimum of 100W
+        // adjustedSurplus capped to 0, below minimum of 100W
         verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 0));
     }
 
@@ -158,7 +163,11 @@ class HeatingControlServiceTest {
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         Power baseSurplus = Power.ofWatts(1500);
         Power currentHeatingPower = Power.ofWatts(200);
-        BatteryStatus batteryStatus = createBatteryStatus(70); // SOC above threshold
+        // New logic: adjustedSurplus = production - (consumption - currentHeating)
+        // For 1700W: production=1900, consumption=200 → 1900 - (200-200) = 1900W
+        // heating priority: availableForHeating = 1900 + 0 = 1900W
+        // But we want 1700W, so: production=1700, consumption=200 → 1700 - 0 = 1700W
+        BatteryStatus batteryStatus = createBatteryStatus(70, 1900, 200, 0);
 
         when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
         when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
@@ -170,8 +179,8 @@ class HeatingControlServiceTest {
         heatingControlService.controlHeatingSummer();
 
         // Then
-        // Total surplus = 1500 + 200 = 1700W
-        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 1700));
+        // adjustedSurplus = 1900 - (200 - 200) = 1900W
+        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 1900));
     }
 
     @Test
@@ -181,7 +190,9 @@ class HeatingControlServiceTest {
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         Power baseSurplus = Power.ofWatts(3500); // Exceeds max of 3000W
         Power currentHeatingPower = Power.ofWatts(200);
-        BatteryStatus batteryStatus = createBatteryStatus(70); // SOC above threshold
+        // New logic: production=3700, consumption=200 → 3700 - (200-200) = 3700W
+        // heating priority: availableForHeating = 3700 + 0 = 3700W, limited to 3000W
+        BatteryStatus batteryStatus = createBatteryStatus(70, 3700, 200, 0);
 
         when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
         when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
@@ -193,7 +204,7 @@ class HeatingControlServiceTest {
         heatingControlService.controlHeatingSummer();
 
         // Then
-        // Total surplus = 3500 + 200 = 3700W, limited to 3000W
+        // adjustedSurplus = 3700W, limited to max 3000W
         verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 3000));
     }
 
@@ -204,7 +215,8 @@ class HeatingControlServiceTest {
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         Power baseSurplus = Power.ofWatts(2800);
         Power currentHeatingPower = Power.ofWatts(200);
-        BatteryStatus batteryStatus = createBatteryStatus(70); // SOC above threshold
+        // New logic: production=3000, consumption=200 → 3000 - (200-200) = 3000W
+        BatteryStatus batteryStatus = createBatteryStatus(70, 3000, 200, 0);
 
         when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
         when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
@@ -216,7 +228,7 @@ class HeatingControlServiceTest {
         heatingControlService.controlHeatingSummer();
 
         // Then
-        // Total surplus = 2800 + 200 = 3000W, exactly at maximum
+        // adjustedSurplus = 3000W, exactly at maximum
         verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 3000));
     }
 
@@ -227,7 +239,8 @@ class HeatingControlServiceTest {
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         Power baseSurplus = Power.ofWatts(1200);
         Power currentHeatingPower = Power.ofWatts(0); // Not currently heating
-        BatteryStatus batteryStatus = createBatteryStatus(70); // SOC above threshold
+        // New logic: production=1200, consumption=0 → 1200 - 0 = 1200W
+        BatteryStatus batteryStatus = createBatteryStatus(70, 1200, 0, 0);
 
         when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
         when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
@@ -239,7 +252,7 @@ class HeatingControlServiceTest {
         heatingControlService.controlHeatingSummer();
 
         // Then
-        // Total surplus = 1200 + 0 = 1200W
+        // adjustedSurplus = 1200W
         verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 1200));
     }
 
@@ -264,7 +277,8 @@ class HeatingControlServiceTest {
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         Power baseSurplus = Power.ofWatts(50);
         Power currentHeatingPower = Power.ofWatts(50);
-        BatteryStatus batteryStatus = createBatteryStatus(70); // SOC above threshold
+        // New logic: production=100, consumption=50 → 100 - (50-50) = 100W
+        BatteryStatus batteryStatus = createBatteryStatus(70, 100, 50, 0);
 
         when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
         when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
@@ -276,7 +290,7 @@ class HeatingControlServiceTest {
         heatingControlService.controlHeatingSummer();
 
         // Then
-        // Total surplus = 50 + 50 = 100W, exactly at minimum
+        // adjustedSurplus = 100W, exactly at minimum
         verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 100));
     }
 
@@ -287,7 +301,8 @@ class HeatingControlServiceTest {
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         Power baseSurplus = Power.ofWatts(49);
         Power currentHeatingPower = Power.ofWatts(50);
-        BatteryStatus batteryStatus = createBatteryStatus(70); // SOC above threshold
+        // New logic: production=99, consumption=50 → 99 - (50-50) = 99W
+        BatteryStatus batteryStatus = createBatteryStatus(70, 99, 50, 0);
 
         when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
         when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
@@ -299,7 +314,7 @@ class HeatingControlServiceTest {
         heatingControlService.controlHeatingSummer();
 
         // Then
-        // Total surplus = 49 + 50 = 99W, just below minimum of 100W
+        // adjustedSurplus = 99W, just below minimum of 100W
         verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 0));
     }
 
@@ -345,7 +360,9 @@ class HeatingControlServiceTest {
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         Power baseSurplus = Power.ofWatts(2000);
         Power currentHeatingPower = Power.ofWatts(0);
-        BatteryStatus batteryStatus = createBatteryStatus(50); // SOC 50% < threshold 60%
+        // New logic: production=2000, consumption=0 → 2000 - 0 = 2000W
+        // Battery priority: 2000 - 1000 (reserved) = 1000W
+        BatteryStatus batteryStatus = createBatteryStatus(50, 2000, 0, 0);
 
         when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
         when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
@@ -360,8 +377,7 @@ class HeatingControlServiceTest {
         heatingControlService.controlHeatingSummer();
 
         // Then
-        // Adjusted surplus = 2000 + 0 = 2000W
-        // Battery priority active: 2000 - 1000 (reserved) = 1000W available for heating
+        // adjustedSurplus = 2000W, battery priority: 2000 - 1000 = 1000W
         verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 1000));
     }
 
@@ -372,7 +388,8 @@ class HeatingControlServiceTest {
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         Power baseSurplus = Power.ofWatts(2000);
         Power currentHeatingPower = Power.ofWatts(0);
-        BatteryStatus batteryStatus = createBatteryStatus(70); // SOC 70% > threshold 60%
+        // New logic: production=2000, consumption=0 → 2000W
+        BatteryStatus batteryStatus = createBatteryStatus(70, 2000, 0, 0);
 
         when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
         when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
@@ -386,8 +403,7 @@ class HeatingControlServiceTest {
         heatingControlService.controlHeatingSummer();
 
         // Then
-        // Battery priority not active (SOC above threshold): full 2000W available for
-        // heating
+        // SOC above threshold, heating priority: full 2000W available
         verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 2000));
     }
 
@@ -398,7 +414,8 @@ class HeatingControlServiceTest {
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         Power baseSurplus = Power.ofWatts(2000);
         Power currentHeatingPower = Power.ofWatts(0);
-        BatteryStatus batteryStatus = createBatteryStatus(50); // SOC 50% < threshold 60%
+        // New logic: production=2000, consumption=0 → 2000W
+        BatteryStatus batteryStatus = createBatteryStatus(50, 2000, 0, 0);
 
         when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
         when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
@@ -422,7 +439,9 @@ class HeatingControlServiceTest {
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         Power baseSurplus = Power.ofWatts(800); // Less than reserved power
         Power currentHeatingPower = Power.ofWatts(0);
-        BatteryStatus batteryStatus = createBatteryStatus(50); // SOC 50% < threshold 60%
+        // New logic: production=800, consumption=0 → 800W
+        // Battery priority: 800 - 1000 = -200W → 0W
+        BatteryStatus batteryStatus = createBatteryStatus(50, 800, 0, 0);
 
         when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
         when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
@@ -437,9 +456,7 @@ class HeatingControlServiceTest {
         heatingControlService.controlHeatingSummer();
 
         // Then
-        // Adjusted surplus = 800 + 0 = 800W
-        // Battery priority: 800 - 1000 = -200W (capped to 0)
-        // 0W < minimum 100W, so heating stops
+        // adjustedSurplus = 800W, battery priority: 800 - 1000 = -200W → 0W < 100W
         verify(heatingRodService, never()).adjustHeating(any());
     }
 
@@ -450,7 +467,9 @@ class HeatingControlServiceTest {
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         Power baseSurplus = Power.ofWatts(1500);
         Power currentHeatingPower = Power.ofWatts(500); // Currently heating
-        BatteryStatus batteryStatus = createBatteryStatus(45); // SOC 45% < threshold 60%
+        // New logic: production=2000, consumption=500 → 2000 - (500-500) = 2000W
+        // Battery priority: 2000 - 1000 = 1000W
+        BatteryStatus batteryStatus = createBatteryStatus(45, 2000, 500, 0);
 
         when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
         when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
@@ -465,8 +484,7 @@ class HeatingControlServiceTest {
         heatingControlService.controlHeatingSummer();
 
         // Then
-        // Adjusted surplus = 1500 + 500 = 2000W
-        // Battery priority: 2000 - 1000 = 1000W available for heating
+        // adjustedSurplus = 2000W, battery priority: 2000 - 1000 = 1000W
         verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 1000));
     }
 
@@ -477,7 +495,8 @@ class HeatingControlServiceTest {
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         Power baseSurplus = Power.ofWatts(2000);
         Power currentHeatingPower = Power.ofWatts(0);
-        BatteryStatus batteryStatus = createBatteryStatus(60); // SOC 60% = threshold 60%
+        // New logic: production=2000, consumption=0 → 2000W
+        BatteryStatus batteryStatus = createBatteryStatus(60, 2000, 0, 0);
 
         when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
         when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
@@ -491,7 +510,7 @@ class HeatingControlServiceTest {
         heatingControlService.controlHeatingSummer();
 
         // Then
-        // SOC equals threshold, priority not active: full 2000W available
+        // SOC equals threshold, heating priority: full 2000W available
         verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 2000));
     }
 
@@ -502,7 +521,8 @@ class HeatingControlServiceTest {
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         Power baseSurplus = Power.ofWatts(2000);
         Power currentHeatingPower = Power.ofWatts(0);
-        BatteryStatus batteryStatus = createBatteryStatus(59); // SOC 59% < threshold 60%
+        // New logic: production=2000, consumption=0 → 2000W
+        BatteryStatus batteryStatus = createBatteryStatus(59, 2000, 0, 0);
 
         when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
         when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
@@ -517,7 +537,7 @@ class HeatingControlServiceTest {
         heatingControlService.controlHeatingSummer();
 
         // Then
-        // SOC just below threshold, priority active: 2000 - 1000 = 1000W
+        // SOC just below threshold, battery priority: 2000 - 1000 = 1000W
         verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 1000));
     }
 
@@ -528,7 +548,9 @@ class HeatingControlServiceTest {
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         Power baseSurplus = Power.ofWatts(5000); // Very high surplus
         Power currentHeatingPower = Power.ofWatts(0);
-        BatteryStatus batteryStatus = createBatteryStatus(50); // SOC 50% < threshold 60%
+        // New logic: production=5000, consumption=0 → 5000W
+        // Battery priority: 5000 - 1000 = 4000W, limited to max 3000W
+        BatteryStatus batteryStatus = createBatteryStatus(50, 5000, 0, 0);
 
         when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
         when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
@@ -544,9 +566,7 @@ class HeatingControlServiceTest {
         heatingControlService.controlHeatingSummer();
 
         // Then
-        // Adjusted surplus = 5000 + 0 = 5000W
-        // Battery priority: 5000 - 1000 = 4000W
-        // Max heating power limits to 3000W
+        // adjustedSurplus = 5000W, battery priority: 5000 - 1000 = 4000W, limited to 3000W
         verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 3000));
     }
 
@@ -557,7 +577,8 @@ class HeatingControlServiceTest {
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         Power baseSurplus = Power.ofWatts(2000);
         Power currentHeatingPower = Power.ofWatts(0);
-        BatteryStatus batteryStatus = createBatteryStatus(50); // SOC 50% < threshold 60%
+        // New logic: production=2000, consumption=0 → 2000W
+        BatteryStatus batteryStatus = createBatteryStatus(50, 2000, 0, 0);
 
         when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
         when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
@@ -572,7 +593,7 @@ class HeatingControlServiceTest {
         heatingControlService.controlHeatingSummer();
 
         // Then
-        // Override active, battery priority ignored: full 2000W available
+        // Override active, heating priority: full 2000W available
         verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 2000));
     }
 
@@ -583,7 +604,8 @@ class HeatingControlServiceTest {
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         Power baseSurplus = Power.ofWatts(2000);
         Power currentHeatingPower = Power.ofWatts(0);
-        BatteryStatus batteryStatus = createBatteryStatus(50); // SOC 50% < threshold 60%
+        // New logic: production=2000, consumption=0 → 2000W
+        BatteryStatus batteryStatus = createBatteryStatus(50, 2000, 0, 0);
 
         when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
         when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
@@ -599,7 +621,7 @@ class HeatingControlServiceTest {
         heatingControlService.controlHeatingSummer();
 
         // Then
-        // Override not active, battery priority applies: 2000 - 1000 = 1000W
+        // Override not active, battery priority: 2000 - 1000 = 1000W
         verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 1000));
     }
 
@@ -715,7 +737,8 @@ class HeatingControlServiceTest {
         // Now temperature drops to 57°C (below restart threshold of 58°C)
         Temperature restartTemp = Temperature.ofCelsius(57.0);
         Power baseSurplus = Power.ofWatts(2000);
-        BatteryStatus batteryStatus = createBatteryStatus(70);
+        // New logic: production=2000, consumption=0 → 2000W
+        BatteryStatus batteryStatus = createBatteryStatus(70, 2000, 0, 0);
 
         when(heatingRodService.readTemperature1()).thenReturn(restartTemp);
         when(heatingRodService.readPower()).thenReturn(Power.ofWatts(0));
@@ -736,7 +759,8 @@ class HeatingControlServiceTest {
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         Power baseSurplus = Power.ofWatts(1500);
         Power currentHeatingPower = Power.ofWatts(0);
-        BatteryStatus batteryStatus = createBatteryStatus(70);
+        // New logic: production=1500, consumption=0 → 1500W
+        BatteryStatus batteryStatus = createBatteryStatus(70, 1500, 0, 0);
 
         when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
         when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
@@ -767,7 +791,8 @@ class HeatingControlServiceTest {
         // Temperature at 64°C (above restart threshold of 63°C with 5°C hysteresis)
         Temperature stillCoolingTemp = Temperature.ofCelsius(64.0);
         Power baseSurplus = Power.ofWatts(2000);
-        BatteryStatus batteryStatus = createBatteryStatus(70);
+        // New logic: production=2000, consumption=0 → 2000W
+        BatteryStatus batteryStatus = createBatteryStatus(70, 2000, 0, 0);
 
         when(heatingRodService.readTemperature1()).thenReturn(stillCoolingTemp);
         when(heatingRodService.readPower()).thenReturn(Power.ofWatts(0));
@@ -791,13 +816,22 @@ class HeatingControlServiceTest {
         verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 2000));
     }
 
-    // Helper method to create BatteryStatus with specific SOC
+    // Helper method to create BatteryStatus with specific SOC (legacy - all power values 0)
     private BatteryStatus createBatteryStatus(int socPercent) {
+        return createBatteryStatus(socPercent, 0, 0, 0);
+    }
+
+    // Helper method to create BatteryStatus with specific values for new calculation logic
+    // The new logic calculates: adjustedSurplus = production - (consumption - currentHeating) - batteryPower (if charging)
+    // For heating priority: availableForHeating = adjustedSurplus + batteryPower
+    // For battery priority: availableForHeating = adjustedSurplus - batteryPower (if discharging) - reservedPower
+    private BatteryStatus createBatteryStatus(int socPercent, long productionWatts, long consumptionWatts,
+            long batteryWatts) {
         return BatteryStatus.builder()
                 .timestamp(LocalDateTime.now())
-                .productionPower(Power.ofWatts(0))
-                .consumptionPower(Power.ofWatts(0))
-                .batteryPower(Power.ofWatts(0))
+                .productionPower(Power.ofWatts(productionWatts))
+                .consumptionPower(Power.ofWatts(consumptionWatts))
+                .batteryPower(Power.ofWatts(batteryWatts))
                 .gridPower(Power.ofWatts(0))
                 .batteryStateOfCharge(Percentage.of(socPercent))
                 .build();

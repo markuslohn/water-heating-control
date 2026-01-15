@@ -72,11 +72,11 @@ public class BatteryStorageService {
         Power batteryPower = readBatteryPower();
 
         // Base solar surplus: Production - Consumption
-        Power surplusPower = productionPower.subtract(houseConsumptionPower);
+        Power surplusPower = productionPower.reduce(houseConsumptionPower);
 
         // If battery is charging, this solar power is not available for other use
         if (batteryPower.isPositive()) {
-            surplusPower = surplusPower.subtract(batteryPower);
+            surplusPower = surplusPower.reduce(batteryPower);
         }
         // If battery is discharging (negative), we ignore it - it's not solar power
 

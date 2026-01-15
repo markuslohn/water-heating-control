@@ -15,6 +15,8 @@ import lombok.Getter;
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class Power {
 
+    public static final Power ZERO = new Power(0);
+
     private final long watts;
 
     public static Power ofWatts(long watts) {
@@ -41,16 +43,44 @@ public class Power {
         return watts < 0;
     }
 
+    public boolean isGreaterThan(Power other) {
+        return this.watts > other.watts;
+    }
+
+    public boolean isGreaterThan(long watts) {
+        return this.watts > watts;
+    }
+
+    public boolean isLessThan(Power other) {
+        return this.watts < other.watts;
+    }
+
+    public boolean isLessThan(long watts) {
+        return this.watts < watts;
+    }
+
     public Power negate() {
         return new Power(-watts);
     }
 
-    public Power add(Power other) {
+    public Power increase(Power other) {
         return new Power(this.watts + other.watts);
     }
 
-    public Power subtract(Power other) {
+    public Power reduce(Power other) {
         return new Power(this.watts - other.watts);
+    }
+
+    public Power reduce(long other) {
+        return new Power(this.watts - other);
+    }
+
+    public static Power max(Power a, Power b) {
+        return a.watts >= b.watts ? a : b;
+    }
+
+    public Power atLeast(Power minimum) {
+        return max(this, minimum);
     }
 
     /**

@@ -42,6 +42,14 @@ public class Percentage {
         return value < 10;
     }
 
+    public boolean isLessThan(Percentage other) {
+        return this.value < other.value;
+    }
+
+    public boolean isLessThan(int other) {
+        return this.isLessThan(Percentage.of(other));
+    }
+
     public String format() {
         return value + "%";
     }
