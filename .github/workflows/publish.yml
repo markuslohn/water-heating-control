@@ -20,5 +20,5 @@ jobs:
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@af1da67850ed9a4cedd57bfd976089dd991e2582 # v4.0.0
     - name: Build and Test with Gradle
-      run: ./gradlew build -Dquarkus.container-image.build=true -Dquarkus.container-image.push=true -Dquarkus.container-image.registry=ghcr.io -Dquarkus.container-image.group=${{ github.repository_owner }} -Dquarkus.container-image.name=name=hot-water-control -Dquarkus.container-image.tag=1.0.0 -Dquarkus.container-image.username=${{ github.repository_owner }} -Dquarkus.container-image.password=${{ secrets.PERSONAL_GITHUB_TOKEN }}
+      run: ./gradlew build -Dquarkus.container-image.build=true -Dquarkus.container-image.push=true -Dquarkus.container-image.registry=ghcr.io -Dquarkus.container-image.group=${{ github.repository_owner }} -Dquarkus.container-image.name=hot-water-control -Dquarkus.container-image.tag=1.0.0 -Dquarkus.container-image.username=${{ github.repository_owner }} -Dquarkus.container-image.password=${{ secrets.PERSONAL_GITHUB_TOKEN }}
 
