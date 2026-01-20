@@ -1,16 +1,13 @@
-name: Quarkus App Build and Test
-run-name: ${{ github.actor }} is building ${{ github.repository }}
+name: Build and Test
 on: [push]
- 
 jobs:
   build:
-
     runs-on: ubuntu-latest
     permissions:
       contents: read
-
     steps:
-    - uses: actions/checkout@v5
+    - name: Checkout Sourcecode
+      uses: actions/checkout@v5
     - name: Set up JDK 21
       uses: actions/setup-java@v5
       with:
@@ -18,5 +15,5 @@ jobs:
         distribution: 'temurin'
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@af1da67850ed9a4cedd57bfd976089dd991e2582 # v4.0.0
-    - name: Build with Gradle Wrapper
+    - name: Build and Test with Gradle
       run: ./gradlew build
