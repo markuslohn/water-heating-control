@@ -1,6 +1,11 @@
 name: Build and Publish
 on: 
  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 1.0.0 or 1.0.0-SNAPSHOT)'
+        required: true
+        type: string
  release:
     types: [created, published]
 env:
@@ -23,7 +28,12 @@ jobs:
     - name: Extract version from tag
       id: version
       run: |
-          VERSION=${GITHUB_REF#refs/tags/}
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/}
+            VERSION=${VERSION#v}
+          fi
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
     - name: Setup Gradle
@@ -34,8 +44,21 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Set Container Image Labels
+      run: |
+          BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          cat >> gradle.properties << EOF
+          quarkus.container-image.labels."org.opencontainers.image.source"=https://github.com/${{ github.repository }}
+          quarkus.container-image.labels."org.opencontainers.image.description"=Quarkus Application
+          quarkus.container-image.labels."org.opencontainers.image.url"=https://github.com/${{ github.repository }}
+          quarkus.container-image.labels."org.opencontainers.image.revision"=${{ github.sha }}
+          quarkus.container-image.labels."org.opencontainers.image.version"=${{ steps.version.outputs.version }}
+          quarkus.container-image.labels."org.opencontainers.image.created"=${BUILD_DATE}
+          quarkus.container-image.labels."org.opencontainers.image.licenses"=MIT
+          EOF
     - name: Build and Push Docker Image
-      run: ./gradlew build \
+      run: |
+           ./gradlew build \
              -Dquarkus.container-image.build=true \
              -Dquarkus.container-image.push=true \
              -Dquarkus.container-image.registry=ghcr.io \
@@ -43,8 +66,6 @@ jobs:
              -Dquarkus.container-image.name=${{ github.event.repository.name }} \
              -Dquarkus.container-image.tag=${{ steps.version.outputs.version }} \
              -Dquarkus.container-image.additional-tags=latest
+        
 
-             
- #-Dquarkus.container-image.username=${{ github.repository_owner }} \
- #-Dquarkus.container-image.password=${{ secrets.PERSONAL_GITHUB_TOKEN }}
 
