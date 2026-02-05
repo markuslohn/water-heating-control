@@ -55,6 +55,7 @@ jobs:
           quarkus.container-image.labels."org.opencontainers.image.version"=${{ steps.version.outputs.version }}
           quarkus.container-image.labels."org.opencontainers.image.created"=${BUILD_DATE}
           quarkus.container-image.labels."org.opencontainers.image.licenses"=MIT
+          quarkus.container-image.labels."org.opencontainers.image.ref.name"=${{ github.ref_name }}
           EOF
     - name: Build and Push Docker Image
       run: |
@@ -65,7 +66,7 @@ jobs:
              -Dquarkus.container-image.group=${{ github.repository_owner }} \
              -Dquarkus.container-image.name=${{ github.event.repository.name }} \
              -Dquarkus.container-image.tag=${{ steps.version.outputs.version }} \
-             -Dquarkus.container-image.additional-tags=latest
+             -Dquarkus.container-image.additional-tags=latest,$(git rev-parse --short HEAD)
         
 
 
