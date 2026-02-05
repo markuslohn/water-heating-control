@@ -10,15 +10,10 @@ group = 'de.bimalo.homeauto'
 // Version aus Git-Tags ermitteln
 def getVersionFromGit() {
     try {
-        def stdout = new ByteArrayOutputStream()
-        exec {
-            commandLine 'git', 'describe', '--tags', '--always', '--dirty'
-            standardOutput = stdout
-            errorOutput = new ByteArrayOutputStream()
-            ignoreExitValue = true
-        }
-        def version = stdout.toString().trim()
-        if (version.isEmpty()) {
+        def process = ['git', 'describe', '--tags', '--always', '--dirty'].execute()
+        process.waitFor()
+        def version = process.text.trim()
+        if (version.isEmpty() || process.exitValue() != 0) {
             return 'dev-SNAPSHOT'
         }
         // Entferne führendes 'v' wenn vorhanden
