@@ -2,7 +2,56 @@ plugins {
     id 'java'
     id 'io.quarkus'
     id 'com.diffplug.spotless' version '6.24.0'
+    id 'com.gorylenko.gradle-git-properties' version '2.5.5'
 }
+
+group = 'de.bimalo.homeauto'
+
+// Version aus Git-Tags ermitteln
+def getVersionFromGit() {
+    try {
+        def process = ['git', 'describe', '--tags', '--always', '--dirty'].execute()
+        process.waitFor()
+        def version = process.text.trim()
+        if (version.isEmpty() || process.exitValue() != 0) {
+            return 'dev-SNAPSHOT'
+        }
+        // Entferne führendes 'v' wenn vorhanden
+        return version.startsWith('v') ? version.substring(1) : version
+    } catch (Exception e) {
+        return 'dev-SNAPSHOT'
+    }
+}
+
+version = getVersionFromGit()
+
+gitProperties {
+    keys = ['git.branch', 'git.commit.id.abbrev', 'git.commit.time', 'git.commit.id.describe']
+    dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
+    dateFormatTimeZone = "UTC"
+}
+
+def getGitProperty(String key, String defaultValue = 'unknown') {
+    def gitPropsFile = file("${buildDir}/resources/main/git.properties")
+    if (gitPropsFile.exists()) {
+        def props = new Properties()
+        gitPropsFile.withInputStream { props.load(it) }
+        return props.getProperty(key, defaultValue)
+    }
+    return defaultValue
+}
+
+task loadGitProperties {
+    dependsOn processResources
+    doLast {
+        project.ext.gitCommit = getGitProperty('git.commit.id.abbrev')
+        project.ext.gitBranch = getGitProperty('git.branch')
+        project.ext.buildTime = new Date().format("yyyy-MM-dd HH:mm:ss", TimeZone.getTimeZone("Europe/Berlin"))
+    }
+}
+
+quarkusBuild.dependsOn loadGitProperties
+
 
 repositories {
     mavenCentral()
@@ -40,9 +89,6 @@ dependencies {
     testCompileOnly("org.projectlombok:lombok:1.18.42")
 	testAnnotationProcessor("org.projectlombok:lombok:1.18.42")
 }
-
-group = 'de.bimalo.homeauto'
-version = '1.0.0'
 
 java {
     sourceCompatibility = JavaVersion.VERSION_21

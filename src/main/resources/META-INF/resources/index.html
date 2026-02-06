@@ -188,6 +188,14 @@
             opacity: 0.8;
         }
 
+        .version-info {
+            text-align: center;
+            color: white;
+            margin-top: 10px;
+            font-size: 0.8em;
+            opacity: 0.6;
+        }
+
         @media (max-width: 768px) {
             h1 {
                 font-size: 1.8em;
@@ -293,12 +301,31 @@
         <div class="last-update">
             Letzte Aktualisierung: <span id="last-update">-</span>
         </div>
+
+        <div class="version-info">
+            Version: <span id="app-version">-</span> |
+            Commit: <span id="app-commit">-</span> |
+            Build: <span id="app-build-time">-</span>
+        </div>
     </div>
 
     <script>
         // Auto-Refresh alle 10 Sekunden
         setInterval(updateStatus, 10000);
         updateStatus();
+        loadVersionInfo();
+
+        async function loadVersionInfo() {
+            try {
+                const response = await fetch('/api/version');
+                const version = await response.json();
+                document.getElementById('app-version').textContent = version.version;
+                document.getElementById('app-commit').textContent = version.gitCommit;
+                document.getElementById('app-build-time').textContent = version.buildTime;
+            } catch (error) {
+                console.error('Error loading version info:', error);
+            }
+        }
 
         function formatPower(watts) {
             return watts > 0 ? `+${watts} W` : `${watts} W`;
