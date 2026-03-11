@@ -33,6 +33,9 @@ public class HeatingControlService {
     // temperature to drop
     private final AtomicBoolean targetReachedCoolingMode = new AtomicBoolean(false);
 
+    // Manual mode: when active, automatic control is suspended
+    private final AtomicBoolean manualModeActive = new AtomicBoolean(false);
+
     @Inject
     public HeatingControlService(
             HeatingControlConfig config,
@@ -97,6 +100,16 @@ public class HeatingControlService {
             // calls
             Power currentHeatingPower = heatingRodService.readPower();
             TemperatureCheck tempCheck = checkTemperature();
+
+            // Manual mode: only monitor temperature, do not adjust heating automatically
+            if (manualModeActive.get()) {
+                if (tempCheck.targetReached()) {
+                    log.info("Target temperature reached in manual mode - deactivating manual mode");
+                    deactivateManualMode();
+                    stopHeating("Target temperature reached in manual mode", currentHeatingPower);
+                }
+                return; // Skip automatic control while in manual mode
+            }
 
             // Check temperature with hysteresis
             if (!handleTemperatureHysteresis(tempCheck, currentHeatingPower)) {
@@ -400,5 +413,37 @@ public class HeatingControlService {
             log.info("Midnight reset: Re-enabling battery priority");
             overrideDate = null;
         }
+    }
+
+    /**
+     * Activates manual mode, suspending automatic heating control.
+     * In manual mode, the heating power is controlled externally (e.g., via REST API)
+     * and automatic adjustments are skipped until manual mode is deactivated.
+     */
+    public void activateManualMode() {
+        if (manualModeActive.compareAndSet(false, true)) {
+            log.info("Manual mode ACTIVATED - automatic heating control suspended");
+        }
+    }
+
+    /**
+     * Deactivates manual mode, resuming automatic heating control.
+     * This is called when:
+     * - The user explicitly sets heating power to 0
+     * - The target temperature is reached while in manual mode
+     */
+    public void deactivateManualMode() {
+        if (manualModeActive.compareAndSet(true, false)) {
+            log.info("Manual mode DEACTIVATED - automatic heating control resumed");
+        }
+    }
+
+    /**
+     * Gets the current state of manual mode.
+     *
+     * @return true if manual mode is active, false if automatic control is active
+     */
+    public boolean isManualModeActive() {
+        return manualModeActive.get();
     }
 }

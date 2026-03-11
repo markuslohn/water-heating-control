@@ -14,11 +14,12 @@ public final class HeatingStatus {
     private final Power power;
     private final Temperature currentTemperature;
     private final Temperature targetTemperature;
+    private final boolean manualMode;
 
     @Override
     public String toString() {
         return String.format(
-                "HeatingStatus[active=%s, power=%s, currentTemp=%s, targetTemp=%s]",
-                active, power, currentTemperature, targetTemperature);
+                "HeatingStatus[active=%s, power=%s, currentTemp=%s, targetTemp=%s, manualMode=%s]",
+                active, power, currentTemperature, targetTemperature, manualMode);
     }
 }

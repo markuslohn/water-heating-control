@@ -820,6 +820,150 @@ class HeatingControlServiceTest {
         verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 2000));
     }
 
+    // ==================== Manual Mode Tests ====================
+
+    @Test
+    void testManualMode_WhenActivated_ShouldSuspendAutomaticControl() {
+        // Given: Normal conditions where automatic control would adjust heating
+        Temperature currentTemp = Temperature.ofCelsius(50.0);
+        Temperature targetTemp = Temperature.ofCelsius(68.0);
+        Power currentHeatingPower = Power.ofWatts(500);
+
+        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
+        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
+        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
+        // Note: Battery mocks not needed - manual mode returns early before surplus check
+
+        // When: Manual mode is activated
+        heatingControlService.activateManualMode();
+        heatingControlService.controlHeatingSummer();
+
+        // Then: Automatic control should NOT adjust heating
+        verify(heatingRodService, never()).adjustHeating(any());
+        assertTrue(heatingControlService.isManualModeActive());
+    }
+
+    @Test
+    void testManualMode_WhenTargetTemperatureReached_ShouldDeactivateAndStopHeating() {
+        // Given: Manual mode active, target temperature reached
+        Temperature currentTemp = Temperature.ofCelsius(70.0);
+        Temperature targetTemp = Temperature.ofCelsius(68.0);
+        Power currentHeatingPower = Power.ofWatts(1000);
+
+        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
+        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
+        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
+
+        // When: Manual mode is active and control runs
+        heatingControlService.activateManualMode();
+        assertTrue(heatingControlService.isManualModeActive());
+
+        heatingControlService.controlHeatingSummer();
+
+        // Then: Manual mode should be deactivated and heating should stop
+        assertFalse(heatingControlService.isManualModeActive());
+        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 0));
+    }
+
+    @Test
+    void testManualMode_WhenDeactivated_ShouldResumeAutomaticControl() {
+        // Given: Manual mode was active, then deactivated
+        Temperature currentTemp = Temperature.ofCelsius(50.0);
+        Temperature targetTemp = Temperature.ofCelsius(68.0);
+        Power baseSurplus = Power.ofWatts(1500);
+        Power currentHeatingPower = Power.ofWatts(0);
+        BatteryStatus batteryStatus = createBatteryStatus(70, 1500, 0, 0);
+
+        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
+        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
+        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
+        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+
+        // When: Manual mode is activated and then deactivated
+        heatingControlService.activateManualMode();
+        heatingControlService.deactivateManualMode();
+        heatingControlService.controlHeatingSummer();
+
+        // Then: Automatic control should resume and adjust heating
+        assertFalse(heatingControlService.isManualModeActive());
+        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 1500));
+    }
+
+    @Test
+    void testManualMode_WhenNotActive_ShouldAllowAutomaticControl() {
+        // Given: Normal conditions, manual mode NOT active
+        Temperature currentTemp = Temperature.ofCelsius(50.0);
+        Temperature targetTemp = Temperature.ofCelsius(68.0);
+        Power baseSurplus = Power.ofWatts(1000);
+        Power currentHeatingPower = Power.ofWatts(0);
+        BatteryStatus batteryStatus = createBatteryStatus(70, 1000, 0, 0);
+
+        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
+        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
+        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
+        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+
+        // When: Control runs without manual mode
+        heatingControlService.controlHeatingSummer();
+
+        // Then: Automatic control should adjust heating
+        assertFalse(heatingControlService.isManualModeActive());
+        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 1000));
+    }
+
+    @Test
+    void testManualMode_WhenTargetNotReached_ShouldStayInManualMode() {
+        // Given: Manual mode active, target temperature NOT reached
+        Temperature currentTemp = Temperature.ofCelsius(50.0);
+        Temperature targetTemp = Temperature.ofCelsius(68.0);
+        Power currentHeatingPower = Power.ofWatts(1000);
+
+        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
+        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
+        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
+
+        // When: Manual mode is active and control runs
+        heatingControlService.activateManualMode();
+        heatingControlService.controlHeatingSummer();
+
+        // Then: Manual mode should remain active and no automatic adjustment
+        assertTrue(heatingControlService.isManualModeActive());
+        verify(heatingRodService, never()).adjustHeating(any());
+    }
+
+    @Test
+    void testIsManualModeActive_InitiallyFalse() {
+        // Given/When: Fresh service instance
+
+        // Then: Manual mode should be inactive by default
+        assertFalse(heatingControlService.isManualModeActive());
+    }
+
+    @Test
+    void testActivateManualMode_WhenAlreadyActive_ShouldRemainActive() {
+        // Given: Manual mode already active
+        heatingControlService.activateManualMode();
+
+        // When: Activate again
+        heatingControlService.activateManualMode();
+
+        // Then: Should still be active
+        assertTrue(heatingControlService.isManualModeActive());
+    }
+
+    @Test
+    void testDeactivateManualMode_WhenAlreadyInactive_ShouldRemainInactive() {
+        // Given: Manual mode not active
+
+        // When: Deactivate
+        heatingControlService.deactivateManualMode();
+
+        // Then: Should still be inactive
+        assertFalse(heatingControlService.isManualModeActive());
+    }
+
     // Helper method to create BatteryStatus with specific SOC (legacy - all power
     // values 0)
     private BatteryStatus createBatteryStatus(int socPercent) {
