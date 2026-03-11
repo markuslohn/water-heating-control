@@ -48,7 +48,7 @@ class HeatingControlServiceTest {
         // Default configuration values (lenient to avoid UnnecessaryStubbingException)
         lenient().when(config.enabled()).thenReturn(true);
         lenient().when(config.minSurplusPower()).thenReturn(100);
-        lenient().when(config.maxHeatingPower()).thenReturn(3000);
+        lenient().when(config.maxHeatingPower()).thenReturn(2900);
         lenient().when(config.batteryPriorityEnabled()).thenReturn(true);
         lenient().when(config.batteryPriorityThreshold()).thenReturn(60);
         lenient().when(config.batteryReservedPower()).thenReturn(1000);
@@ -112,7 +112,8 @@ class HeatingControlServiceTest {
         Power currentHeatingPower = Power.ofWatts(200);
         // New logic: adjustedSurplus = production - (consumption - currentHeating)
         // For 50W result: production=250, consumption=200 → 250 - (200-200) = 250W
-        // Then in heating priority: availableForHeating = 250 + 0 = 250W (above minimum)
+        // Then in heating priority: availableForHeating = 250 + 0 = 250W (above
+        // minimum)
         BatteryStatus batteryStatus = createBatteryStatus(70, 250, 200, 0);
 
         when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
@@ -138,7 +139,8 @@ class HeatingControlServiceTest {
         Power baseSurplus = Power.ofWatts(-200); // Negative surplus
         Power currentHeatingPower = Power.ofWatts(150); // Current heating
         // New logic: adjustedSurplus = production - (consumption - currentHeating)
-        // For negative result: production=100, consumption=300 → 100 - (300-150) = -50W → capped to 0
+        // For negative result: production=100, consumption=300 → 100 - (300-150) = -50W
+        // → capped to 0
         // heating priority: availableForHeating = 0 + 0 = 0W < 100W → stop
         BatteryStatus batteryStatus = createBatteryStatus(70, 100, 300, 0);
 
@@ -191,7 +193,7 @@ class HeatingControlServiceTest {
         Power baseSurplus = Power.ofWatts(3500); // Exceeds max of 3000W
         Power currentHeatingPower = Power.ofWatts(200);
         // New logic: production=3700, consumption=200 → 3700 - (200-200) = 3700W
-        // heating priority: availableForHeating = 3700 + 0 = 3700W, limited to 3000W
+        // heating priority: availableForHeating = 3700 + 0 = 3700W, limited to 2900W
         BatteryStatus batteryStatus = createBatteryStatus(70, 3700, 200, 0);
 
         when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
@@ -204,8 +206,8 @@ class HeatingControlServiceTest {
         heatingControlService.controlHeatingSummer();
 
         // Then
-        // adjustedSurplus = 3700W, limited to max 3000W
-        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 3000));
+        // adjustedSurplus = 3700W, limited to max 2900W
+        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 2900));
     }
 
     @Test
@@ -215,8 +217,8 @@ class HeatingControlServiceTest {
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         Power baseSurplus = Power.ofWatts(2800);
         Power currentHeatingPower = Power.ofWatts(200);
-        // New logic: production=3000, consumption=200 → 3000 - (200-200) = 3000W
-        BatteryStatus batteryStatus = createBatteryStatus(70, 3000, 200, 0);
+        // New logic: production=2900, consumption=200 → 2900 - (200-200) = 2900W
+        BatteryStatus batteryStatus = createBatteryStatus(70, 2900, 200, 0);
 
         when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
         when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
@@ -228,8 +230,8 @@ class HeatingControlServiceTest {
         heatingControlService.controlHeatingSummer();
 
         // Then
-        // adjustedSurplus = 3000W, exactly at maximum
-        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 3000));
+        // adjustedSurplus = 2900, exactly at maximum
+        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 2900));
     }
 
     @Test
@@ -566,7 +568,8 @@ class HeatingControlServiceTest {
         heatingControlService.controlHeatingSummer();
 
         // Then
-        // adjustedSurplus = 5000W, battery priority: 5000 - 1000 = 4000W, limited to 3000W
+        // adjustedSurplus = 5000W, battery priority: 5000 - 1000 = 4000W, limited to
+        // 3000W
         verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 3000));
     }
 
@@ -586,7 +589,8 @@ class HeatingControlServiceTest {
         when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
         when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
         when(config.batteryPriorityEnabled()).thenReturn(true);
-        // batteryPriorityThreshold and batteryReservedPower not mocked - not used when override is active
+        // batteryPriorityThreshold and batteryReservedPower not mocked - not used when
+        // override is active
 
         // When
         heatingControlService.setBatteryPriorityOverride(true); // Disable battery priority
@@ -816,15 +820,19 @@ class HeatingControlServiceTest {
         verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 2000));
     }
 
-    // Helper method to create BatteryStatus with specific SOC (legacy - all power values 0)
+    // Helper method to create BatteryStatus with specific SOC (legacy - all power
+    // values 0)
     private BatteryStatus createBatteryStatus(int socPercent) {
         return createBatteryStatus(socPercent, 0, 0, 0);
     }
 
-    // Helper method to create BatteryStatus with specific values for new calculation logic
-    // The new logic calculates: adjustedSurplus = production - (consumption - currentHeating) - batteryPower (if charging)
+    // Helper method to create BatteryStatus with specific values for new
+    // calculation logic
+    // The new logic calculates: adjustedSurplus = production - (consumption -
+    // currentHeating) - batteryPower (if charging)
     // For heating priority: availableForHeating = adjustedSurplus + batteryPower
-    // For battery priority: availableForHeating = adjustedSurplus - batteryPower (if discharging) - reservedPower
+    // For battery priority: availableForHeating = adjustedSurplus - batteryPower
+    // (if discharging) - reservedPower
     private BatteryStatus createBatteryStatus(int socPercent, long productionWatts, long consumptionWatts,
             long batteryWatts) {
         return BatteryStatus.builder()
