@@ -257,7 +257,32 @@ public class HeatingControlService {
             availableForHeating = calculateAvailablePowerHeatingPriority(adjustedSurplus, baseSurplus, ctx);
         }
 
+        // Apply solar power reduction percentage
+        availableForHeating = applySolarPowerReduction(availableForHeating);
+
         return availableForHeating.atLeast(Power.ZERO);
+    }
+
+    /**
+     * Applies the configured solar power reduction percentage.
+     * This provides a safety margin to avoid grid feed-in fluctuations.
+     *
+     * @param power the power to reduce
+     * @return the reduced power
+     */
+    private Power applySolarPowerReduction(Power power) {
+        int reductionPercent = config.solarPowerReductionPercent();
+        if (reductionPercent <= 0 || power.getWatts() <= 0) {
+            return power;
+        }
+
+        int reductionWatts = (int) ((long) power.getWatts() * reductionPercent / 100);
+        Power reducedPower = power.reduce(reductionWatts);
+
+        log.debug("Applied {}% solar power reduction: {} W → {} W (reduced by {} W)",
+                reductionPercent, power.getWatts(), reducedPower.getWatts(), reductionWatts);
+
+        return reducedPower;
     }
 
     /**

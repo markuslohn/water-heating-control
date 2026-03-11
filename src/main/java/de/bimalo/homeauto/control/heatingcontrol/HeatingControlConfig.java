@@ -77,6 +77,15 @@ public interface HeatingControlConfig {
     @WithDefault("10.0")
     double temperatureHysteresis();
 
+    /**
+     * Percentage to reduce available solar power.
+     * This provides a safety margin to avoid grid feed-in fluctuations.
+     * Example: 5 means reduce available power by 5% (2000W → 1900W).
+     */
+    @Min(0)
+    @WithDefault("5")
+    int solarPowerReductionPercent();
+
     // ========== Seasonal Operating Hours ==========
 
     /**

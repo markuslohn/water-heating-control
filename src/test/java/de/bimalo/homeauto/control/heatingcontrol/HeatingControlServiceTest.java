@@ -54,6 +54,7 @@ class HeatingControlServiceTest {
         lenient().when(config.batteryPriorityEnabled()).thenReturn(true);
         lenient().when(config.batteryPriorityThreshold()).thenReturn(60);
         lenient().when(config.batteryReservedPower()).thenReturn(1000);
+        lenient().when(config.solarPowerReductionPercent()).thenReturn(0); // Default: no reduction
     }
 
     @Test
@@ -1005,6 +1006,151 @@ class HeatingControlServiceTest {
 
         // When/Then
         assertFalse(heatingControlService.isCurrentSeasonEnabled());
+    }
+
+    // ==================== Solar Power Reduction Tests ====================
+
+    @Test
+    void testControlHeating_WithSolarPowerReduction_ShouldReduceAvailablePower() {
+        // Given: 2000W available, 5% reduction should result in 1900W
+        Temperature currentTemp = Temperature.ofCelsius(50.0);
+        Temperature targetTemp = Temperature.ofCelsius(68.0);
+        Power baseSurplus = Power.ofWatts(2000);
+        Power currentHeatingPower = Power.ofWatts(0);
+        BatteryStatus batteryStatus = createBatteryStatus(70, 2000, 0, 0);
+
+        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
+        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
+        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
+        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(config.solarPowerReductionPercent()).thenReturn(5);
+
+        // When
+        heatingControlService.controlHeatingSummer();
+
+        // Then: 2000W - 5% = 1900W
+        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 1900));
+    }
+
+    @Test
+    void testControlHeating_WithZeroReduction_ShouldNotReducePower() {
+        // Given: 2000W available, 0% reduction should result in 2000W
+        Temperature currentTemp = Temperature.ofCelsius(50.0);
+        Temperature targetTemp = Temperature.ofCelsius(68.0);
+        Power baseSurplus = Power.ofWatts(2000);
+        Power currentHeatingPower = Power.ofWatts(0);
+        BatteryStatus batteryStatus = createBatteryStatus(70, 2000, 0, 0);
+
+        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
+        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
+        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
+        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(config.solarPowerReductionPercent()).thenReturn(0);
+
+        // When
+        heatingControlService.controlHeatingSummer();
+
+        // Then: No reduction, full 2000W
+        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 2000));
+    }
+
+    @Test
+    void testControlHeating_WithHighReduction_ShouldReduceSignificantly() {
+        // Given: 2000W available, 10% reduction should result in 1800W
+        Temperature currentTemp = Temperature.ofCelsius(50.0);
+        Temperature targetTemp = Temperature.ofCelsius(68.0);
+        Power baseSurplus = Power.ofWatts(2000);
+        Power currentHeatingPower = Power.ofWatts(0);
+        BatteryStatus batteryStatus = createBatteryStatus(70, 2000, 0, 0);
+
+        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
+        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
+        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
+        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(config.solarPowerReductionPercent()).thenReturn(10);
+
+        // When
+        heatingControlService.controlHeatingSummer();
+
+        // Then: 2000W - 10% = 1800W
+        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 1800));
+    }
+
+    @Test
+    void testControlHeating_WithReduction_AndMaxPower_ShouldApplyReductionBeforeMax() {
+        // Given: 4000W available, 5% reduction = 3800W, then limited to max 2900W
+        // Order: checkSurplusPower applies reduction first, then max limit is applied
+        Temperature currentTemp = Temperature.ofCelsius(50.0);
+        Temperature targetTemp = Temperature.ofCelsius(68.0);
+        Power baseSurplus = Power.ofWatts(4000);
+        Power currentHeatingPower = Power.ofWatts(0);
+        BatteryStatus batteryStatus = createBatteryStatus(70, 4000, 0, 0);
+
+        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
+        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
+        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
+        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(config.solarPowerReductionPercent()).thenReturn(5);
+
+        // When
+        heatingControlService.controlHeatingSummer();
+
+        // Then: 4000W - 5% = 3800W, then limited to max 2900W
+        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 2900));
+    }
+
+    @Test
+    void testControlHeating_WithReduction_ResultBelowMinimum_ShouldNotHeat() {
+        // Given: 150W available (not currently heating), 40% reduction = 90W < 100W minimum
+        Temperature currentTemp = Temperature.ofCelsius(50.0);
+        Temperature targetTemp = Temperature.ofCelsius(68.0);
+        Power baseSurplus = Power.ofWatts(150);
+        Power currentHeatingPower = Power.ofWatts(0); // Not currently heating
+        BatteryStatus batteryStatus = createBatteryStatus(70, 150, 0, 0);
+
+        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
+        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
+        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
+        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(config.solarPowerReductionPercent()).thenReturn(40); // 150 - 40% = 90W < 100W min
+
+        // When
+        heatingControlService.controlHeatingSummer();
+
+        // Then: 150W - 40% = 90W < 100W minimum → should not start heating
+        verify(heatingRodService, never()).adjustHeating(any());
+    }
+
+    @Test
+    void testControlHeating_WithReduction_AndBatteryPriority_ShouldApplyBoth() {
+        // Given: 3000W available, battery priority reserves 1000W → 2000W
+        // Then 5% reduction → 1900W
+        Temperature currentTemp = Temperature.ofCelsius(50.0);
+        Temperature targetTemp = Temperature.ofCelsius(68.0);
+        Power baseSurplus = Power.ofWatts(3000);
+        Power currentHeatingPower = Power.ofWatts(0);
+        BatteryStatus batteryStatus = createBatteryStatus(50, 3000, 0, 0); // SOC below threshold
+
+        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
+        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
+        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
+        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(config.batteryPriorityEnabled()).thenReturn(true);
+        when(config.batteryPriorityThreshold()).thenReturn(60);
+        when(config.batteryReservedPower()).thenReturn(1000);
+        when(config.solarPowerReductionPercent()).thenReturn(5);
+
+        // When
+        heatingControlService.controlHeatingSummer();
+
+        // Then: 3000W - 1000W reserved = 2000W, then 5% reduction = 1900W
+        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 1900));
     }
 
     // Helper method to create BatteryStatus with specific SOC (legacy - all power
