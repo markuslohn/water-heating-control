@@ -1,5 +1,6 @@
 package de.bimalo.homeauto.control.heatingcontrol;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -15,6 +16,7 @@ import de.bimalo.homeauto.control.heatingrod.HeatingRodService;
 import de.bimalo.homeauto.entity.BatteryStatus;
 import de.bimalo.homeauto.entity.Percentage;
 import de.bimalo.homeauto.entity.Power;
+import de.bimalo.homeauto.entity.Season;
 import de.bimalo.homeauto.entity.Temperature;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.BeforeEach;
@@ -962,6 +964,47 @@ class HeatingControlServiceTest {
 
         // Then: Should still be inactive
         assertFalse(heatingControlService.isManualModeActive());
+    }
+
+    // ==================== Season Tests ====================
+
+    @Test
+    void testGetCurrentSeason_ShouldReturnValidSeason() {
+        // When
+        Season season = heatingControlService.getCurrentSeason();
+
+        // Then
+        assertEquals(Season.current(), season);
+    }
+
+    @Test
+    void testIsCurrentSeasonEnabled_WhenCurrentSeasonEnabled_ShouldReturnTrue() {
+        // Given: Enable the current season
+        Season currentSeason = Season.current();
+        switch (currentSeason) {
+            case WINTER -> when(config.winterEnabled()).thenReturn(true);
+            case SPRING -> when(config.springEnabled()).thenReturn(true);
+            case SUMMER -> when(config.summerEnabled()).thenReturn(true);
+            case AUTUMN -> when(config.autumnEnabled()).thenReturn(true);
+        }
+
+        // When/Then
+        assertTrue(heatingControlService.isCurrentSeasonEnabled());
+    }
+
+    @Test
+    void testIsCurrentSeasonEnabled_WhenCurrentSeasonDisabled_ShouldReturnFalse() {
+        // Given: Disable the current season
+        Season currentSeason = Season.current();
+        switch (currentSeason) {
+            case WINTER -> when(config.winterEnabled()).thenReturn(false);
+            case SPRING -> when(config.springEnabled()).thenReturn(false);
+            case SUMMER -> when(config.summerEnabled()).thenReturn(false);
+            case AUTUMN -> when(config.autumnEnabled()).thenReturn(false);
+        }
+
+        // When/Then
+        assertFalse(heatingControlService.isCurrentSeasonEnabled());
     }
 
     // Helper method to create BatteryStatus with specific SOC (legacy - all power

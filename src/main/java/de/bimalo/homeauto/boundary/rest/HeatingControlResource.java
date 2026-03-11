@@ -2,6 +2,7 @@ package de.bimalo.homeauto.boundary.rest;
 
 import de.bimalo.homeauto.control.heatingcontrol.HeatingControlService;
 import de.bimalo.homeauto.control.heatingrod.HeatingRodService;
+import de.bimalo.homeauto.entity.Season;
 import de.bimalo.homeauto.entity.HeatingStatus;
 import de.bimalo.homeauto.entity.Power;
 import de.bimalo.homeauto.entity.Temperature;
@@ -42,6 +43,7 @@ public class HeatingControlResource {
         Power power = heatingRodService.readPower();
         Temperature currentTemp = heatingRodService.readTemperature1();
         Temperature targetTemp = heatingRodService.readTargetTemperature();
+        Season currentSeason = heatingControlService.getCurrentSeason();
 
         return HeatingStatus.builder()
                 .active(power.getWatts() > 0)
@@ -49,6 +51,9 @@ public class HeatingControlResource {
                 .currentTemperature(currentTemp)
                 .targetTemperature(targetTemp)
                 .manualMode(heatingControlService.isManualModeActive())
+                .season(currentSeason.getDisplayName())
+                .seasonEmoji(currentSeason.getEmoji())
+                .seasonEnabled(heatingControlService.isCurrentSeasonEnabled())
                 .build();
     }
 
