@@ -4,6 +4,7 @@ import de.bimalo.homeauto.control.battery.BatteryStorageService;
 import de.bimalo.homeauto.control.heatingrod.HeatingRodService;
 import de.bimalo.homeauto.entity.BatteryStatus;
 import de.bimalo.homeauto.entity.Power;
+import de.bimalo.homeauto.entity.Season;
 import de.bimalo.homeauto.entity.Temperature;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -452,5 +453,28 @@ public class HeatingControlService {
      */
     public boolean isManualModeActive() {
         return manualModeActive.get();
+    }
+
+    /**
+     * Gets the current season based on the current date.
+     *
+     * @return the current season
+     */
+    public Season getCurrentSeason() {
+        return Season.current();
+    }
+
+    /**
+     * Checks if the current season's schedule is enabled in configuration.
+     *
+     * @return true if the current season is enabled, false otherwise
+     */
+    public boolean isCurrentSeasonEnabled() {
+        return switch (getCurrentSeason()) {
+            case WINTER -> config.winterEnabled();
+            case SPRING -> config.springEnabled();
+            case SUMMER -> config.summerEnabled();
+            case AUTUMN -> config.autumnEnabled();
+        };
     }
 }
