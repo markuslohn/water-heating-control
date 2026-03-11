@@ -256,6 +256,10 @@
                     <span class="status-value" id="heating-active">-</span>
                 </div>
                 <div class="status-item">
+                    <span class="status-label">Modus:</span>
+                    <span class="status-value" id="heating-mode">-</span>
+                </div>
+                <div class="status-item">
                     <span class="status-label">Aktuelle Leistung:</span>
                     <span class="status-value" id="heating-power">-</span>
                 </div>
@@ -279,6 +283,11 @@
                 <button class="btn-primary" onclick="setHeating()">Setzen</button>
                 <button class="btn-danger" onclick="stopHeating()">Stoppen</button>
             </div>
+            <p style="margin-top: 15px; color: #666; font-size: 0.9em;">
+                Bei Eingabe einer Leistung > 0 W wird der manuelle Modus aktiviert und die Automatik pausiert.
+                Der manuelle Modus wird automatisch deaktiviert, wenn die Zieltemperatur erreicht wird oder
+                die Leistung auf 0 W gesetzt wird.
+            </p>
         </div>
 
         <!-- Batterie-Priorität Steuerung -->
@@ -371,6 +380,7 @@
                 console.log('[DEBUG] Heating data:', heating);
 
                 document.getElementById('heating-active').textContent = heating.active ? '🟢 AN' : '🔴 AUS';
+                document.getElementById('heating-mode').textContent = heating.manualMode ? '🔧 MANUELL' : '🤖 AUTOMATIK';
                 document.getElementById('heating-power').textContent = `${heating.power.watts} W`;
                 document.getElementById('current-temp').textContent = formatTemperature(heating.currentTemperature);
                 document.getElementById('target-temp').textContent = formatTemperature(heating.targetTemperature);

@@ -1,5 +1,6 @@
 package de.bimalo.homeauto.boundary.rest;
 
+import de.bimalo.homeauto.control.heatingcontrol.HeatingControlService;
 import de.bimalo.homeauto.control.heatingrod.HeatingRodService;
 import de.bimalo.homeauto.entity.HeatingStatus;
 import de.bimalo.homeauto.entity.Power;
@@ -25,10 +26,13 @@ public class HeatingControlResource {
     @Inject
     HeatingRodService heatingRodService;
 
+    @Inject
+    HeatingControlService heatingControlService;
+
     /**
      * Gets the current heating rod status.
      *
-     * @return current heating status including active state, power and temperatures
+     * @return current heating status including active state, power, temperatures and manual mode
      */
     @GET
     @Path("/status")
@@ -44,13 +48,16 @@ public class HeatingControlResource {
                 .power(power)
                 .currentTemperature(currentTemp)
                 .targetTemperature(targetTemp)
+                .manualMode(heatingControlService.isManualModeActive())
                 .build();
     }
 
     /**
      * Manually controls the heating rod power.
+     * When watts > 0, manual mode is activated and automatic control is suspended.
+     * When watts = 0, manual mode is deactivated and automatic control resumes.
      *
-     * @param watts the desired power in watts (0 to stop heating)
+     * @param watts the desired power in watts (0 to stop heating and resume automatic control)
      * @return HTTP response indicating success or failure
      */
     @POST
@@ -59,9 +66,15 @@ public class HeatingControlResource {
         log.info("REST: Manual heating control requested with {} W", watts);
 
         try {
+            if (watts > 0) {
+                heatingControlService.activateManualMode();
+            } else {
+                heatingControlService.deactivateManualMode();
+            }
             heatingRodService.adjustHeating(Power.ofWatts(watts));
             return Response.ok()
-                    .entity(String.format("Heating adjusted to %d W", watts))
+                    .entity(String.format("Heating adjusted to %d W (manual mode: %s)",
+                            watts, watts > 0 ? "active" : "inactive"))
                     .build();
         } catch (IllegalArgumentException e) {
             return Response.status(Response.Status.BAD_REQUEST)
