@@ -30,7 +30,7 @@ public interface HeatingControlConfig {
      * Limits the heating power even if more surplus is available.
      */
     @Min(1)
-    @WithDefault("3000")
+    @WithDefault("2900")
     int maxHeatingPower();
 
     /**
