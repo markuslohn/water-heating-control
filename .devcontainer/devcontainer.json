@@ -1,26 +1,26 @@
 {
-	"name": "Water Heating Control Development Environment",
+	"name": "Java Development",
 	"build": {
 		"context": ".",
-		"dockerfile": "Dockerfile",
-		"args": {
-			"network": "host",
-		},
+		"dockerfile": "Dockerfile"
 	},
 	"features": {
 		"ghcr.io/devcontainers/features/java:1": {
-			"version": "latest",
-			"jdkDistro": "ms"
+			"version": "21",
+			"jdkDistro": "ms",
+			"installGradle": true,
+			"gradleVersion": "latest"
 		},
 		"ghcr.io/devcontainers/features/git:1": {},
-		"ghcr.io/devcontainers-extra/features/gradle-sdkman:2": {
-			"version": "latest"
-		},
-		"ghcr.io/rocker-org/devcontainer-features/apt-packages:1": {
-			"packages": "curl,traceroute,iputils-ping"
-		}
+		"ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
 	},
-	// Configure tool-specific properties
+	"mounts": [
+		"source=${localEnv:HOME}/.claude,target=/home/vscode/.claude,type=bind",
+		"source=${localWorkspaceFolder}/../CLAUDE.md,target=/workspaces/CLAUDE.md,type=bind,readonly"
+	],
+	"containerEnv": {
+		"CLAUDE_CONFIG_DIR": "/home/vscode/.claude"
+	},
 	"customizations": {
 		"vscode": {
 			"extensions": [
@@ -36,6 +36,10 @@
 		8081,
 		5005
 	],
-	// Use 'postCreateCommand' to run commands after the container is created
-	"postCreateCommand": "echo 'Development Environment ready!'"
+	"runArgs": [
+		"--tmpfs=/tmp:exec,mode=1777"
+	],
+	"remoteUser": "vscode",
+	//"postStartCommand": "sudo chmod 1777 /tmp",
+	"postCreateCommand": "echo 'Java Development Environment ready!'"
 }
