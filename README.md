@@ -59,8 +59,13 @@ heatingrod.modbus.host=192.168.200.73
 heatingrod.modbus.port=502
 
 # Heating System (Viessmann) Modbus TCP Configuration
-heating.modbus.host=192.168.200.31
-heating.modbus.port=502
+gasheating.modbus.host=192.168.200.31
+gasheating.modbus.port=502
+
+# Interval at which the external Modbus request is refreshed while gas heating
+# is active (the Vitodens falls back to internal control if not refreshed).
+# Supports duration expressions: "1m", "30s", "2m30s"
+gasheating.keep-alive-interval=2m
 ```
 
 ### Heating Control Settings

@@ -5,6 +5,8 @@ import com.digitalpetri.modbus.client.ModbusTcpClientTransport;
 import com.digitalpetri.modbus.exceptions.ModbusExecutionException;
 import com.digitalpetri.modbus.exceptions.ModbusResponseException;
 import com.digitalpetri.modbus.exceptions.ModbusTimeoutException;
+import com.digitalpetri.modbus.pdu.ReadDiscreteInputsRequest;
+import com.digitalpetri.modbus.pdu.ReadDiscreteInputsResponse;
 import com.digitalpetri.modbus.pdu.ReadHoldingRegistersRequest;
 import com.digitalpetri.modbus.pdu.ReadHoldingRegistersResponse;
 import com.digitalpetri.modbus.pdu.ReadInputRegistersRequest;
@@ -151,7 +153,8 @@ public abstract class AbstractModbusClient implements AutoCloseable {
     }
 
     /**
-     * Reads an unsigned 32-bit integer value from two consecutive holding registers.
+     * Reads an unsigned 32-bit integer value from two consecutive holding
+     * registers.
      * Always interprets the value as unsigned (0 to 4,294,967,295).
      *
      * @param address the starting register address
@@ -304,6 +307,26 @@ public abstract class AbstractModbusClient implements AutoCloseable {
         } catch (ModbusExecutionException | ModbusResponseException | ModbusTimeoutException e) {
             throw new ModbusReadException("Failed to read unsigned 32-bit integer from input register", host, port,
                     address, e);
+        }
+    }
+
+    /**
+     * Reads a status value from a discrete input register.
+     *
+     * @param address the discrete input address
+     * @return the status as an integer (0 or 1)
+     * @throws ModbusReadException if reading fails
+     */
+    protected int readDiscreteInputStatus(int address) {
+        checkConnectivity();
+
+        log.debug("Reads discrete input status from modbus register address {}...", address);
+        ReadDiscreteInputsRequest request = new ReadDiscreteInputsRequest(address, 1);
+        try {
+            ReadDiscreteInputsResponse response = client.readDiscreteInputs(1, request);
+            return response.inputs()[0] & 0x01;
+        } catch (ModbusExecutionException | ModbusResponseException | ModbusTimeoutException e) {
+            throw new ModbusReadException("Failed to read discrete input status", host, port, address, e);
         }
     }
 
