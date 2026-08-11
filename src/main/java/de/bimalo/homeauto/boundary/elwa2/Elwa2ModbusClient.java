@@ -2,6 +2,10 @@ package de.bimalo.homeauto.boundary.elwa2;
 
 import de.bimalo.homeauto.boundary.modbus.AbstractModbusClient;
 import de.bimalo.homeauto.entity.DeviceInfo;
+import de.bimalo.homeauto.entity.Power;
+import de.bimalo.homeauto.entity.Temperature;
+import java.time.Duration;
+import java.util.Objects;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -10,7 +14,9 @@ public final class Elwa2ModbusClient extends AbstractModbusClient {
     /**
      * Maximum power supported by the ELWA2 heating rod in watts.
      */
-    public static final int MAX_POWER_WATTS = 3500;
+    public static final int MAX_POWER_WATTS = 3200;
+
+    private static final Power MAX_POWER = Power.ofWatts(MAX_POWER_WATTS);
 
     public Elwa2ModbusClient(String host, int port) {
         super(host, port);
@@ -43,16 +49,16 @@ public final class Elwa2ModbusClient extends AbstractModbusClient {
         return String.valueOf(this.readUnsignedInteger(Elwa2Register.FIRMWARE_VERSION.getAddress()));
     }
 
-    public double readTemperature1() {
+    public Temperature readTemperature1() {
         Elwa2Register register = Elwa2Register.TEMP_1;
         int rawValue = this.readUnsignedInteger(register.getAddress());
-        return rawValue / register.getScaleFactor();
+        return Temperature.ofCelsius(rawValue * register.getScaleFactor());
     }
 
-    public double readTargetTemperature() {
+    public Temperature readTargetTemperature() {
         Elwa2Register register = Elwa2Register.TARGET_TEMP;
         int rawValue = this.readUnsignedInteger(register.getAddress());
-        return rawValue / register.getScaleFactor();
+        return Temperature.ofCelsius(rawValue * register.getScaleFactor());
     }
 
     public Elwa2Status readStatus() {
@@ -60,30 +66,32 @@ public final class Elwa2ModbusClient extends AbstractModbusClient {
         return Elwa2Status.fromValue(rawValue);
     }
 
-    public int readPower() {
-        return this.readUnsignedInteger(Elwa2Register.POWER.getAddress());
+    public Power readPower() {
+        return Power.ofWatts(this.readUnsignedInteger(Elwa2Register.POWER.getAddress()));
     }
 
-    public int readMaxPower() {
-        return this.readUnsignedInteger(Elwa2Register.MAX_POWER.getAddress());
+    public Power readMaxPower() {
+        return Power.ofWatts(this.readUnsignedInteger(Elwa2Register.MAX_POWER.getAddress()));
     }
 
-    public int readPowerTimeout() {
-        return this.readUnsignedInteger(Elwa2Register.POWER_TIMEOUT.getAddress());
+    public Duration readPowerTimeout() {
+        return Duration.ofSeconds(this.readUnsignedInteger(Elwa2Register.POWER_TIMEOUT.getAddress()));
     }
 
     /**
      * Sets the power of the ELWA2 heating rod.
      *
-     * @param power the desired power in watts
+     * @param power the desired power
+     * @throws NullPointerException     if power is null
      * @throws IllegalArgumentException if power is negative or exceeds
      *                                  MAX_POWER_WATTS
      */
-    public void setPower(int power) {
-        if (power < 0 || power > MAX_POWER_WATTS) {
+    public void setPower(Power power) {
+        Objects.requireNonNull(power, "Power must not be null");
+        if (power.isNegative() || power.isGreaterThan(MAX_POWER)) {
             throw new IllegalArgumentException(
-                    String.format("Power must be between 0 and %d W, but was: %d W", MAX_POWER_WATTS, power));
+                    String.format("Power must be between 0 and %d W, but was: %s", MAX_POWER_WATTS, power));
         }
-        this.writeUnsignedInteger(Elwa2Register.POWER.getAddress(), power);
+        this.writeUnsignedInteger(Elwa2Register.POWER.getAddress(), (int) power.getWatts());
     }
 }

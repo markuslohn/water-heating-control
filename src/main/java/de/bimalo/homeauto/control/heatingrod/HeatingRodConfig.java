@@ -18,6 +18,16 @@ public interface HeatingRodConfig {
     ModbusConfig modbus();
 
     /**
+     * Interval at which it is checked whether the heating power request needs to
+     * be refreshed. The ELWA2 reverts to standby on its own if the power request
+     * isn't refreshed within its own power timeout (see
+     * {@link de.bimalo.homeauto.boundary.elwa2.Elwa2ModbusClient#readPowerTimeout()}).
+     * Supports duration expressions like "10s", "1m".
+     */
+    @WithDefault("10s")
+    String keepAliveCheckInterval();
+
+    /**
      * Modbus Konfiguration.
      */
     interface ModbusConfig {
