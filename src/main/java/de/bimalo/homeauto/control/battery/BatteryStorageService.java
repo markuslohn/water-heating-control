@@ -96,8 +96,7 @@ public class BatteryStorageService {
     @Fallback(fallbackMethod = "readGridPowerFallback")
     @CircuitBreakerName("e3dc-grid-power")
     Power readGridPower() {
-        long rawValue = modbusClient.readGridPower();
-        Power result = Power.ofWatts(rawValue);
+        Power result = modbusClient.readGridPower();
         lastKnownGridPower = result;
         return result;
     }
@@ -117,8 +116,7 @@ public class BatteryStorageService {
     @Fallback(fallbackMethod = "readBatteryPowerFallback")
     @CircuitBreakerName("e3dc-battery-power")
     Power readBatteryPower() {
-        long rawValue = modbusClient.readBatteryPower();
-        Power result = Power.ofWatts(rawValue);
+        Power result = modbusClient.readBatteryPower();
         lastKnownBatteryPower = result;
         return result;
     }
@@ -138,8 +136,7 @@ public class BatteryStorageService {
     @Fallback(fallbackMethod = "readProductionPowerFallback")
     @CircuitBreakerName("e3dc-production-power")
     Power readProductionPower() {
-        long rawValue = modbusClient.readProductionPower();
-        Power result = Power.ofWatts(rawValue);
+        Power result = modbusClient.readProductionPower();
         lastKnownProductionPower = result;
         return result;
     }
@@ -159,8 +156,7 @@ public class BatteryStorageService {
     @Fallback(fallbackMethod = "readHouseConsumptionPowerFallback")
     @CircuitBreakerName("e3dc-consumption-power")
     Power readHouseConsumptionPower() {
-        long rawValue = modbusClient.readHouseConsumptionPower();
-        Power result = Power.ofWatts(rawValue);
+        Power result = modbusClient.readHouseConsumptionPower();
         lastKnownConsumptionPower = result;
         return result;
     }
@@ -180,8 +176,7 @@ public class BatteryStorageService {
     @Fallback(fallbackMethod = "readBatteryStateOfChargeFallback")
     @CircuitBreakerName("e3dc-battery-soc")
     Percentage readBatteryStateOfCharge() {
-        int rawValue = modbusClient.readBatteryStateOfCharge();
-        Percentage result = Percentage.of(rawValue);
+        Percentage result = modbusClient.readBatteryStateOfCharge();
         lastKnownBatteryStateOfCharge = result;
         return result;
     }
