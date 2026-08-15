@@ -2,6 +2,8 @@ package de.bimalo.homeauto.boundary.e3dc;
 
 import de.bimalo.homeauto.boundary.modbus.AbstractModbusClient;
 import de.bimalo.homeauto.entity.DeviceInfo;
+import de.bimalo.homeauto.entity.Percentage;
+import de.bimalo.homeauto.entity.Power;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -29,29 +31,28 @@ public final class E3dcModbusClient extends AbstractModbusClient {
         }
     }
 
-    public long readProductionPower() {
+    public Power readProductionPower() {
         long rawValue = readUnsigned32BitInteger(E3dcRegister.PV_EXTENDED_POWER.getAddress());
         if (rawValue > 0) {
-            return 4294967296L - readUnsigned32BitInteger(E3dcRegister.PV_EXTENDED_POWER.getAddress());
-        } else {
-            return rawValue;
+            rawValue = 4294967296L - readUnsigned32BitInteger(E3dcRegister.PV_EXTENDED_POWER.getAddress());
         }
+        return Power.ofWatts(rawValue);
     }
 
-    public long readBatteryPower() {
-        return read32BitInteger(E3dcRegister.BATTERY_POWER.getAddress());
+    public Power readBatteryPower() {
+        return Power.ofWatts(read32BitInteger(E3dcRegister.BATTERY_POWER.getAddress()));
     }
 
-    public long readHouseConsumptionPower() {
-        return read32BitInteger(E3dcRegister.HOUSE_POWER.getAddress());
+    public Power readHouseConsumptionPower() {
+        return Power.ofWatts(read32BitInteger(E3dcRegister.HOUSE_POWER.getAddress()));
     }
 
-    public long readGridPower() {
-        return read32BitInteger(E3dcRegister.GRID_POWER.getAddress());
+    public Power readGridPower() {
+        return Power.ofWatts(read32BitInteger(E3dcRegister.GRID_POWER.getAddress()));
     }
 
-    public int readBatteryStateOfCharge() {
-        return readUnsignedInteger(E3dcRegister.BATTERY_SOC.getAddress());
+    public Percentage readBatteryStateOfCharge() {
+        return Percentage.of(readUnsignedInteger(E3dcRegister.BATTERY_SOC.getAddress()));
     }
 
     /**

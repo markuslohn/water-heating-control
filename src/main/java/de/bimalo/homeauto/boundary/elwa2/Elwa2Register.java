@@ -12,8 +12,8 @@ import lombok.Getter;
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 public enum Elwa2Register {
 
-    TEMP_1(1001, "Temp 1 (internal Sensor in AC ELWA 2)", 10.0),
-    TARGET_TEMP(1002, "Tmax (target temperature solare powered)", 10.0),
+    TEMP_1(1001, "Temp 1 (internal Sensor in AC ELWA 2)", 0.1),
+    TARGET_TEMP(1002, "Tmax (target temperature solare powered)", 0.1),
     STATUS(1003, "Operating status", 1.0),
     POWER(1000, "Power", 1.0),
     MAX_POWER(1014, "max Power", 1.0),
