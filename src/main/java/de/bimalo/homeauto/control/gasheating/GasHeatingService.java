@@ -141,6 +141,7 @@ public class GasHeatingService {
      */
     public void continueHeating() {
         modbusClient.writeExternalRequest(ExternalRequestMode.MODBUS_CONNECTION);
+        active.set(true);
     }
 
     /**
@@ -150,6 +151,7 @@ public class GasHeatingService {
      */
     @Scheduled(every = "{gasheating.keep-alive-interval}")
     public void keepExternalRequestAlive() {
+        System.out.println("keep " + active.get());
         if (!active.get()) {
             return;
         }

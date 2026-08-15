@@ -22,7 +22,7 @@ public interface GasHeatingConfig {
      * is active. The Vitodens falls back to internal control if this register isn't
      * refreshed periodically. Supports duration expressions like "1m", "30s".
      */
-    @WithDefault("2m")
+    @WithDefault("25s")
     String keepAliveInterval();
 
     /**
