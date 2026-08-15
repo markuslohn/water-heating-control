@@ -1,0 +1,63 @@
+package de.bimalo.homeauto.control.gasheating;
+
+import de.bimalo.homeauto.boundary.viessman.VitodensModbusClient;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
+
+/**
+ * Manual integration test for GasHeatingService.
+ * Communicates with the actual Vitodens gas heating system, no assertions -
+ * intended for manual activation/deactivation of hot water production.
+ */
+@Tag("integration")
+class GasHeatingServiceIT {
+
+    private GasHeatingService service;
+
+    @BeforeEach
+    void setUp() {
+        VitodensModbusClient client = new VitodensModbusClient("192.168.200.64", 502);
+        service = new GasHeatingService(null, client);
+        service.initialize();
+    }
+
+    @AfterEach
+    void tearDown() {
+        if (service != null) {
+            service.shutdown();
+        }
+    }
+
+    @Test
+    void activateGasHeating() throws InterruptedException {
+        System.out.println("Current Temperature: " + service.readHotWaterCurrentTemperature());
+        System.out.println("Target Temperature: " + service.readHotWaterTargetTemperature());
+        System.out.println("Heating active before: " + service.isHeatingActive());
+
+        service.activateHeating();
+        System.out.println("Heating active after: " + service.isHeatingActive());
+
+        // GasHeatingService's @Scheduled keep-alive only runs inside a managed
+        // Quarkus context, which this manual test deliberately doesn't bootstrap.
+        // The Vitodens falls back to internal control if the external request
+        // isn't refreshed within 25 seconds, so it is refreshed here explicitly
+        // at that cadence instead (status is printed on the same cadence).
+        for (int i = 1; i <= 12; i++) {
+            Thread.sleep(25_000);
+            service.continueHeating();
+            System.out.println("[+" + (i * 25) + "s] Heating active: " + service.isHeatingActive()
+                    + ", Current Temperature: " + service.readHotWaterCurrentTemperature());
+        }
+    }
+
+    @Test
+    void deactivateGasHeating() {
+        System.out.println("Heating active before: " + service.isHeatingActive());
+
+        service.deactivateHeating();
+
+        System.out.println("Heating active after: " + service.isHeatingActive());
+    }
+}
