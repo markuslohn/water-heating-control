@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Heizstab-Steuerung</title>
+    <title>Warmwasser-Steuerung</title>
     <style>
         * {
             margin: 0;
@@ -32,11 +32,27 @@
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
         }
 
+        .season-banner {
+            background: white;
+            border-radius: 15px;
+            padding: 18px 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            font-size: 1.4em;
+            font-weight: 600;
+            color: #333;
+        }
+
         .status-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            grid-template-columns: repeat(2, 1fr);
             gap: 20px;
             margin-bottom: 20px;
+        }
+
+        .status-grid-3 {
+            grid-template-columns: repeat(3, 1fr);
         }
 
         .status-box {
@@ -88,27 +104,27 @@
             color: #ef4444;
         }
 
-        .heating-active {
+        .status-active {
             background: linear-gradient(135deg, #10b981 0%, #059669 100%);
         }
 
-        .heating-inactive {
+        .status-inactive {
             background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
         }
 
-        .heating-active h2,
-        .heating-inactive h2 {
+        .status-active h2,
+        .status-inactive h2 {
             color: white;
             border-bottom-color: white;
         }
 
-        .heating-active .status-label,
-        .heating-inactive .status-label {
+        .status-active .status-label,
+        .status-inactive .status-label {
             color: rgba(255, 255, 255, 0.9);
         }
 
-        .heating-active .status-value,
-        .heating-inactive .status-value {
+        .status-active .status-value,
+        .status-inactive .status-value {
             color: white;
             font-weight: 600;
         }
@@ -201,7 +217,8 @@
                 font-size: 1.8em;
             }
 
-            .status-grid {
+            .status-grid,
+            .status-grid-3 {
                 grid-template-columns: 1fr;
             }
 
@@ -220,16 +237,14 @@
 
 <body>
     <div class="container">
-        <h1>🔥 Heizstab-Steuerung</h1>
+        <h1>🔥 Warmwasser-Steuerung</h1>
+
+        <div class="season-banner" id="season-banner">-</div>
 
         <div class="status-grid">
-            <!-- Batteriestatus -->
+            <!-- Energie -->
             <div class="status-box">
-                <h2>⚡ Batteriestatus</h2>
-                <div class="status-item">
-                    <span class="status-label">Batterieladung:</span>
-                    <span class="status-value" id="battery-soc">-</span>
-                </div>
+                <h2>☀️ Energie</h2>
                 <div class="status-item">
                     <span class="status-label">PV-Produktion:</span>
                     <span class="status-value positive" id="battery-production">-</span>
@@ -239,12 +254,36 @@
                     <span class="status-value" id="battery-consumption">-</span>
                 </div>
                 <div class="status-item">
+                    <span class="status-label">Netz-Leistung:</span>
+                    <span class="status-value" id="grid-power">-</span>
+                </div>
+            </div>
+
+            <!-- Batteriestatus -->
+            <div class="status-box">
+                <h2>⚡ Batteriestatus</h2>
+                <div class="status-item">
+                    <span class="status-label">Batterieladung:</span>
+                    <span class="status-value" id="battery-soc">-</span>
+                </div>
+                <div class="status-item">
                     <span class="status-label">Batterie-Leistung:</span>
                     <span class="status-value" id="battery-power">-</span>
                 </div>
+            </div>
+        </div>
+
+        <div class="status-grid status-grid-3">
+            <!-- Elektroauto -->
+            <div class="status-box" id="wallbox-status-box">
+                <h2>🚗 Elektroauto</h2>
                 <div class="status-item">
-                    <span class="status-label">Netz-Leistung:</span>
-                    <span class="status-value" id="grid-power">-</span>
+                    <span class="status-label">Lädt:</span>
+                    <span class="status-value" id="wallbox-charging">-</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Ladeleistung:</span>
+                    <span class="status-value" id="wallbox-power">-</span>
                 </div>
             </div>
 
@@ -271,9 +310,22 @@
                     <span class="status-label">Zieltemperatur:</span>
                     <span class="status-value" id="target-temp">-</span>
                 </div>
+            </div>
+
+            <!-- Gasheizung -->
+            <div class="status-box" id="gasheating-status-box">
+                <h2>🔥 Gasheizung</h2>
                 <div class="status-item">
-                    <span class="status-label">Saison:</span>
-                    <span class="status-value" id="heating-season">-</span>
+                    <span class="status-label">Status:</span>
+                    <span class="status-value" id="gasheating-active">-</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Aktuelle Temperatur:</span>
+                    <span class="status-value" id="gasheating-current-temp">-</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Zieltemperatur:</span>
+                    <span class="status-value" id="gasheating-target-temp">-</span>
                 </div>
             </div>
         </div>
@@ -389,11 +441,11 @@
                 document.getElementById('current-temp').textContent = formatTemperature(heating.currentTemperature);
                 document.getElementById('target-temp').textContent = formatTemperature(heating.targetTemperature);
 
-                const seasonStatus = heating.seasonEnabled ? '🟢' : '🔴';
-                document.getElementById('heating-season').textContent = `${heating.seasonEmoji} ${heating.season} (${seasonStatus} ${heating.seasonEnabled ? 'aktiv' : 'inaktiv'})`;
+                document.getElementById('season-banner').textContent =
+                    `${heating.seasonEmoji} ${heating.season} (${heating.seasonEnabled ? 'aktiv' : 'inaktiv'})`;
 
                 const box = document.getElementById('heating-status-box');
-                box.className = 'status-box ' + (heating.active ? 'heating-active' : 'heating-inactive');
+                box.className = 'status-box ' + (heating.active ? 'status-active' : 'status-inactive');
 
                 // Battery Priority Status
                 console.log('[DEBUG] Fetching battery priority status...');
@@ -404,6 +456,35 @@
                 console.log('[DEBUG] Battery priority data:', priorityData);
 
                 document.getElementById('battery-priority-status').textContent = priorityData.active ? '🟢 AKTIV' : '🔴 DEAKTIVIERT';
+
+                // Wallbox Status
+                console.log('[DEBUG] Fetching wallbox status...');
+                const wallboxResponse = await fetch('/api/wallbox/status');
+                console.log('[DEBUG] Wallbox response status:', wallboxResponse.status);
+
+                const wallbox = await wallboxResponse.json();
+                console.log('[DEBUG] Wallbox data:', wallbox);
+
+                document.getElementById('wallbox-charging').textContent = wallbox.charging ? '🟢 JA' : '🔴 NEIN';
+                document.getElementById('wallbox-power').textContent = formatPower(wallbox.chargingPower.watts);
+
+                const wallboxBox = document.getElementById('wallbox-status-box');
+                wallboxBox.className = 'status-box ' + (wallbox.charging ? 'status-active' : 'status-inactive');
+
+                // Gas Heating Status
+                console.log('[DEBUG] Fetching gas heating status...');
+                const gasHeatingResponse = await fetch('/api/gasheating/status');
+                console.log('[DEBUG] Gas heating response status:', gasHeatingResponse.status);
+
+                const gasHeating = await gasHeatingResponse.json();
+                console.log('[DEBUG] Gas heating data:', gasHeating);
+
+                document.getElementById('gasheating-active').textContent = gasHeating.active ? '🟢 AN' : '🔴 AUS';
+                document.getElementById('gasheating-current-temp').textContent = formatTemperature(gasHeating.currentTemperature);
+                document.getElementById('gasheating-target-temp').textContent = formatTemperature(gasHeating.targetTemperature);
+
+                const gasHeatingBox = document.getElementById('gasheating-status-box');
+                gasHeatingBox.className = 'status-box ' + (gasHeating.active ? 'status-active' : 'status-inactive');
 
                 // Update timestamp
                 document.getElementById('last-update').textContent = new Date().toLocaleTimeString('de-DE');
