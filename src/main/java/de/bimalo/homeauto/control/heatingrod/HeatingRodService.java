@@ -27,6 +27,8 @@ import org.eclipse.microprofile.faulttolerance.Timeout;
 @ApplicationScoped
 public class HeatingRodService {
 
+    private static final Duration DEFAULT_POWER_TIMEOUT = Duration.ofMinutes(1);
+
     private final Elwa2ModbusClient modbusClient;
     private final HeatingRodConfig config;
 
@@ -161,8 +163,21 @@ public class HeatingRodService {
         return lastKnownMaxPower;
     }
 
+    @CircuitBreaker(
+            requestVolumeThreshold = 4,
+            failureRatio = 0.5,
+            delay = 5000,
+            successThreshold = 2)
+    @Timeout(value = 3000)
+    @Fallback(fallbackMethod = "readPowerTimeoutFallback")
+    @CircuitBreakerName("elwa2-power-timeout")
     public Duration readPowerTimeout() {
         return modbusClient.readPowerTimeout();
+    }
+
+    private Duration readPowerTimeoutFallback(Exception e) {
+        log.error("Failed to read power timeout, returning default value of {}", DEFAULT_POWER_TIMEOUT, e);
+        return DEFAULT_POWER_TIMEOUT;
     }
 
     /**

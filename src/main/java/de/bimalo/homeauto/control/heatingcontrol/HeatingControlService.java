@@ -37,6 +37,9 @@ public class HeatingControlService {
     // Manual mode: when active, automatic control is suspended
     private final AtomicBoolean manualModeActive = new AtomicBoolean(false);
 
+    // Smooths upward heating power adjustments; downward adjustments stay immediate
+    private final SurplusPowerSmoother surplusPowerSmoother = new SurplusPowerSmoother();
+
     @Inject
     public HeatingControlService(
             HeatingControlConfig config,
@@ -134,7 +137,11 @@ public class HeatingControlService {
                         surplusPower.getWatts(), heatingPower.getWatts());
             }
 
-            adjustHeatingPower(heatingPower, tempCheck);
+            Power smoothedHeatingPower = surplusPowerSmoother.determineTargetPower(
+                    heatingPower, currentHeatingPower,
+                    config.powerIncreaseSmoothingWindow(), config.minPowerChangeThreshold());
+
+            adjustHeatingPower(smoothedHeatingPower, tempCheck);
 
         } catch (Exception e) {
             log.error("Error during heating control", e);

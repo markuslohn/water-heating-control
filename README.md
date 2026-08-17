@@ -51,21 +51,25 @@ All configuration settings are defined in `src/main/resources/application.proper
 
 ```properties
 # Battery Storage (E3/DC) Modbus TCP Configuration
-battery.modbus.host=192.168.200.48
+battery.modbus.host=192.168.1.48
 battery.modbus.port=502
 
 # Heating Rod (ELWA2) Modbus TCP Configuration
-heatingrod.modbus.host=192.168.200.73
+heatingrod.modbus.host=192.168.1.2
 heatingrod.modbus.port=502
 
 # Heating System (Viessmann) Modbus TCP Configuration
-gasheating.modbus.host=192.168.200.31
+gasheating.modbus.host=192.168.1.3
 gasheating.modbus.port=502
 
 # Interval at which the external Modbus request is refreshed while gas heating
 # is active (the Vitodens falls back to internal control if not refreshed).
 # Supports duration expressions: "1m", "30s", "2m30s"
-gasheating.keep-alive-interval=2m
+gasheating.keep-alive-interval=20s
+
+# Wallbox (go-eCharger) Modbus TCP Configuration
+wallbox.modbus.host=192.168.1.4
+wallbox.modbus.port=502
 ```
 
 ### Heating Control Settings
@@ -80,11 +84,7 @@ heatingctl.min-surplus-power=100
 
 # Maximum heating power (in watts)
 # Limits heating power even if more surplus is available
-heatingctl.max-heating-power=3000
-
-# Schedule interval for automatic control checks
-# Supports duration expressions: "1m", "30s", "2m30s"
-heatingctl.schedule-interval=1m
+heatingctl.max-heating-power=2900
 
 # Battery Priority Configuration
 # Master switch to enable/disable battery priority feature completely
@@ -102,6 +102,23 @@ heatingctl.battery-reserved-power=1000
 # Prevents frequent on/off cycling when temperature fluctuates near target
 # Example: With target 68°C and hysteresis 10°C, heating restarts at 58°C
 heatingctl.temperature-hysteresis=10.0
+
+# Percentage to reduce available solar power (safety margin)
+# Provides a buffer to avoid grid feed-in fluctuations
+# Example: 5 means reduce available power by 5% (2000W → 1900W)
+heatingctl.solar-power-reduction-percent=5
+
+# Power Increase Smoothing Configuration
+# Time window over which upward heating power adjustments are averaged, to
+# smooth out short-lived surplus spikes (e.g. passing clouds). Downward
+# adjustments are not affected and take effect immediately on every cycle.
+# Supports duration expressions: "150s", "2m30s"
+heatingctl.power-increase-smoothing-window=150s
+
+# Minimum power difference (in watts) between the currently applied heating
+# power and the newly determined power required to trigger an adjustment.
+# Prevents chattering adjustments for minor surplus fluctuations.
+heatingctl.min-power-change-threshold=100
 ```
 
 **Battery Priority Override:**
@@ -317,9 +334,12 @@ Access at `http://localhost:8080/q/health`
    - If surplus power < minimum threshold → stop heating
    - If surplus power available → adjust heating power to match surplus (up to maximum)
 
-7. **Power adjustment**:
+7. **Power adjustment** (smoothed):
    - Automatically accounts for current heating power in surplus calculation
    - Respects configured maximum power limit
+   - **Downward adjustments** (surplus decreasing) are applied immediately on every 40-second cycle
+   - **Upward adjustments** (surplus increasing) are smoothed: the average surplus over a configurable time window (default: 150 seconds) is used instead of the instantaneous reading, avoiding overreaction to short-lived spikes (e.g. passing clouds)
+   - An adjustment is only sent if it differs from the currently applied power by at least a configurable threshold (default: 100W), suppressing minor fluctuations
    - Prioritizes battery charging when SOC is low
    - Sends commands via Modbus to ELWA2
 

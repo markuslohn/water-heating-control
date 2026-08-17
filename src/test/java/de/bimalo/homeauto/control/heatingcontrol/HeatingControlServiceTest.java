@@ -18,6 +18,7 @@ import de.bimalo.homeauto.entity.Percentage;
 import de.bimalo.homeauto.entity.Power;
 import de.bimalo.homeauto.entity.Season;
 import de.bimalo.homeauto.entity.Temperature;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -55,6 +56,8 @@ class HeatingControlServiceTest {
         lenient().when(config.batteryPriorityThreshold()).thenReturn(60);
         lenient().when(config.batteryReservedPower()).thenReturn(1000);
         lenient().when(config.solarPowerReductionPercent()).thenReturn(0); // Default: no reduction
+        lenient().when(config.powerIncreaseSmoothingWindow()).thenReturn(Duration.ofSeconds(150));
+        lenient().when(config.minPowerChangeThreshold()).thenReturn(0); // Default: no threshold suppression
     }
 
     @Test
