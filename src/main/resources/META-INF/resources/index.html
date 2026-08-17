@@ -295,10 +295,6 @@
                     <span class="status-value" id="heating-active">-</span>
                 </div>
                 <div class="status-item">
-                    <span class="status-label">Modus:</span>
-                    <span class="status-value" id="heating-mode">-</span>
-                </div>
-                <div class="status-item">
                     <span class="status-label">Aktuelle Leistung:</span>
                     <span class="status-value" id="heating-power">-</span>
                 </div>
@@ -436,13 +432,13 @@
                 console.log('[DEBUG] Heating data:', heating);
 
                 document.getElementById('heating-active').textContent = heating.active ? '🟢 AN' : '🔴 AUS';
-                document.getElementById('heating-mode').textContent = heating.manualMode ? '🔧 MANUELL' : '🤖 AUTOMATIK';
                 document.getElementById('heating-power').textContent = `${heating.power.watts} W`;
                 document.getElementById('current-temp').textContent = formatTemperature(heating.currentTemperature);
                 document.getElementById('target-temp').textContent = formatTemperature(heating.targetTemperature);
 
+                const mode = heating.manualMode ? '🔧 MANUELL' : '🤖 AUTOMATIK';
                 document.getElementById('season-banner').textContent =
-                    `${heating.seasonEmoji} ${heating.season} (${heating.seasonEnabled ? 'aktiv' : 'inaktiv'})`;
+                    `${heating.seasonEmoji} ${heating.season} (${heating.seasonEnabled ? 'aktiv' : 'inaktiv'}) · ${mode}`;
 
                 const box = document.getElementById('heating-status-box');
                 box.className = 'status-box ' + (heating.active ? 'status-active' : 'status-inactive');
