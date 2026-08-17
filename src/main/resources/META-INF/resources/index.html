@@ -330,19 +330,25 @@
             </div>
         </div>
 
-        <!-- Manuelle Steuerung -->
+        <!-- Manuelle Warmwassererzeugung -->
         <div class="control-box">
-            <h2>🎛️ Manuelle Steuerung</h2>
-            <div class="control-group">
-                <input type="number" id="watt-input" min="0" max="3500" step="100" value="0"
-                    placeholder="Leistung in Watt">
-                <button class="btn-primary" onclick="setHeating()">Setzen</button>
-                <button class="btn-danger" onclick="stopHeating()">Stoppen</button>
+            <h2>🎛️ Manuelle Warmwassererzeugung</h2>
+            <div class="status-item">
+                <span class="status-label">Status:</span>
+                <span class="status-value" id="manual-heating-status">-</span>
+            </div>
+            <div class="status-item" id="manual-heating-source-row" style="display: none;">
+                <span class="status-label">Quelle:</span>
+                <span class="status-value" id="manual-heating-source">-</span>
+            </div>
+            <div class="control-group" style="margin-top: 15px;">
+                <button class="btn-primary" onclick="startManualWaterHeating()">Starten</button>
+                <button class="btn-danger" onclick="stopManualWaterHeating()">Stoppen</button>
             </div>
             <p style="margin-top: 15px; color: #666; font-size: 0.9em;">
-                Bei Eingabe einer Leistung > 0 W wird der manuelle Modus aktiviert und die Automatik pausiert.
-                Der manuelle Modus wird automatisch deaktiviert, wenn die Zieltemperatur erreicht wird oder
-                die Leistung auf 0 W gesetzt wird.
+                Nutzt PV-Überschuss und, wenn die Heizstab-Temperatur unter 42°C fällt und die Batterie über 65%
+                geladen ist, zusätzlich Batterieleistung (max. 850 W, bis Batterie 50% erreicht) – ohne Netzstrom
+                zu ziehen. Ist keine elektrische Leistung verfügbar, springt bei Bedarf die Gasheizung ein.
             </p>
         </div>
 
@@ -487,6 +493,27 @@
                 const gasHeatingBox = document.getElementById('gasheating-status-box');
                 gasHeatingBox.className = 'status-box ' + (gasHeating.active ? 'status-active' : 'status-inactive');
 
+                // Manual Water Heating Status
+                console.log('[DEBUG] Fetching manual water heating status...');
+                const manualHeatingResponse = await fetch('/api/manual-water-heating/status');
+                console.log('[DEBUG] Manual water heating response status:', manualHeatingResponse.status);
+
+                const manualHeating = await manualHeatingResponse.json();
+                console.log('[DEBUG] Manual water heating data:', manualHeating);
+
+                document.getElementById('manual-heating-status').textContent =
+                    manualHeating.active ? '🟢 AKTIV' : '🔴 INAKTIV';
+
+                const sourceLabels = { PV: '☀️ PV', BATTERY: '🔋 Batterie', GAS: '🔥 Gas', NONE: '⏸️ Keine' };
+                const sourceRow = document.getElementById('manual-heating-source-row');
+                if (manualHeating.active) {
+                    sourceRow.style.display = '';
+                    document.getElementById('manual-heating-source').textContent =
+                        sourceLabels[manualHeating.source] || manualHeating.source;
+                } else {
+                    sourceRow.style.display = 'none';
+                }
+
                 // Update timestamp
                 document.getElementById('last-update').textContent = new Date().toLocaleTimeString('de-DE');
                 console.log('[DEBUG] Update completed successfully');
@@ -496,33 +523,21 @@
             }
         }
 
-        async function setHeating() {
-            const watts = document.getElementById('watt-input').value;
-            if (watts < 0 || watts > 3500) {
-                alert('Bitte einen Wert zwischen 0 und 3500 W eingeben');
-                return;
-            }
-
+        async function startManualWaterHeating() {
             try {
-                const response = await fetch(`/api/heatingrod/control?watts=${watts}`, { method: 'POST' });
-                if (response.ok) {
-                    updateStatus();
-                } else {
-                    const error = await response.text();
-                    alert('Fehler: ' + error);
-                }
+                await fetch('/api/manual-water-heating/start', { method: 'POST' });
+                updateStatus();
             } catch (error) {
-                alert('Fehler beim Setzen der Heizleistung: ' + error.message);
+                alert('Fehler beim Starten der manuellen Warmwassererzeugung: ' + error.message);
             }
         }
 
-        async function stopHeating() {
+        async function stopManualWaterHeating() {
             try {
-                await fetch('/api/heatingrod/control?watts=0', { method: 'POST' });
-                document.getElementById('watt-input').value = 0;
+                await fetch('/api/manual-water-heating/stop', { method: 'POST' });
                 updateStatus();
             } catch (error) {
-                alert('Fehler beim Stoppen der Heizung: ' + error.message);
+                alert('Fehler beim Stoppen der manuellen Warmwassererzeugung: ' + error.message);
             }
         }
 

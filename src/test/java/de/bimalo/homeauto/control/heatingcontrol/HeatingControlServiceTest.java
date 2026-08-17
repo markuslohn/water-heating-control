@@ -850,7 +850,7 @@ class HeatingControlServiceTest {
     }
 
     @Test
-    void testManualMode_WhenTargetTemperatureReached_ShouldDeactivateAndStopHeating() {
+    void testManualMode_WhenTargetTemperatureReached_ShouldStayInManualModeWithoutAdjusting() {
         // Given: Manual mode active, target temperature reached
         Temperature currentTemp = Temperature.ofCelsius(70.0);
         Temperature targetTemp = Temperature.ofCelsius(68.0);
@@ -866,9 +866,10 @@ class HeatingControlServiceTest {
 
         heatingControlService.controlHeatingSummer();
 
-        // Then: Manual mode should be deactivated and heating should stop
-        assertFalse(heatingControlService.isManualModeActive());
-        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 0));
+        // Then: Automatic control stays fully suspended - the external controller (not
+        // HeatingControlService) is responsible for the heating rod while in manual mode
+        assertTrue(heatingControlService.isManualModeActive());
+        verify(heatingRodService, never()).adjustHeating(any());
     }
 
     @Test

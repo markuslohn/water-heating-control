@@ -105,14 +105,11 @@ public class HeatingControlService {
             Power currentHeatingPower = heatingRodService.readPower();
             TemperatureCheck tempCheck = checkTemperature();
 
-            // Manual mode: only monitor temperature, do not adjust heating automatically
+            // Manual mode: automatic control is fully suspended. An external controller
+            // (e.g. ManualWaterHeatingService) owns the heating rod while manual mode is
+            // active, including its own target-temperature handling.
             if (manualModeActive.get()) {
-                if (tempCheck.targetReached()) {
-                    log.info("Target temperature reached in manual mode - deactivating manual mode");
-                    deactivateManualMode();
-                    stopHeating("Target temperature reached in manual mode", currentHeatingPower);
-                }
-                return; // Skip automatic control while in manual mode
+                return;
             }
 
             // Check temperature with hysteresis
