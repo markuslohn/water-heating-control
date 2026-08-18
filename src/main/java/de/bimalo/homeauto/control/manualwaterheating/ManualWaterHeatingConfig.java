@@ -39,10 +39,21 @@ public interface ManualWaterHeatingConfig {
     int batterySocStopThreshold();
 
     /**
+     * Maximum battery state of charge drop (in percentage points), measured
+     * from the SOC at the moment battery-assisted heating started, before it
+     * stops - regardless of the absolute {@link #batterySocStopThreshold()}.
+     * Example: assist starts at 85% SOC with a limit of 10 -&gt; stops once SOC
+     * reaches 75%, even if that is still above the absolute stop threshold.
+     */
+    @Min(0)
+    @WithDefault("10")
+    int maxBatterySocDropPercent();
+
+    /**
      * Maximum power (in watts) the battery may contribute to heating.
      */
     @Min(0)
-    @WithDefault("850")
+    @WithDefault("800")
     int maxBatteryHeatingPower();
 
     /**
@@ -50,7 +61,7 @@ public interface ManualWaterHeatingConfig {
      * including power already used to cover house consumption.
      */
     @Min(0)
-    @WithDefault("1500")
+    @WithDefault("1400")
     int batteryMaxDischargePower();
 
     /**
@@ -66,6 +77,6 @@ public interface ManualWaterHeatingConfig {
      * while after shutoff (thermal inertia).
      */
     @Min(0)
-    @WithDefault("5.0")
+    @WithDefault("2.0")
     double gasHeatingShutoffTemperatureOffset();
 }

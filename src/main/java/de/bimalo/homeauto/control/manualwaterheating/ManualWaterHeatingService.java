@@ -23,8 +23,11 @@ import lombok.extern.slf4j.Slf4j;
  * when no electrical power is available. Replaces the previous free-form
  * manual power control.
  * <p>
- * Started and stopped explicitly (e.g. via the dashboard); while active, it
- * suspends {@link HeatingControlService}'s automatic PV-surplus control.
+ * Started explicitly (e.g. via the dashboard); while active, it suspends
+ * {@link HeatingControlService}'s automatic PV-surplus control. It stops
+ * itself automatically as soon as one of the defined targets is reached (the
+ * heating rod's target temperature, or - while gas heating was actively
+ * running - the gas heating target), resuming automatic control.
  */
 @Slf4j
 @ApplicationScoped
@@ -44,6 +47,10 @@ public class ManualWaterHeatingService {
     private final AtomicBoolean rodTargetReached = new AtomicBoolean(false);
     private final AtomicBoolean batteryAssistActive = new AtomicBoolean(false);
     private final AtomicBoolean gasAssistActive = new AtomicBoolean(false);
+
+    // Battery SOC recorded when the current battery-assist session started, used to
+    // enforce the maximum allowed SOC drop for that session.
+    private volatile int batteryAssistStartSoc;
 
     private volatile HeatingSource currentSource = HeatingSource.NONE;
 
@@ -120,13 +127,24 @@ public class ManualWaterHeatingService {
         heatingRodService.adjustHeating(decision.power());
         currentSource = decision.source();
 
+        if (rodTargetReached.get()) {
+            log.info("Manual water heating: rod target temperature reached, deactivating manual mode");
+            deactivate();
+            return;
+        }
+
         if (decision.power().isPositive()) {
             if (gasHeatingService.isHeatingActive()) {
                 gasHeatingService.deactivateHeating();
             }
             gasAssistActive.set(false);
-        } else {
-            manageGasFallback();
+            return;
+        }
+
+        boolean gasTargetReached = manageGasFallback();
+        if (gasTargetReached) {
+            log.info("Manual water heating: gas heating target reached, deactivating manual mode");
+            deactivate();
         }
     }
 
@@ -138,9 +156,6 @@ public class ManualWaterHeatingService {
         }
 
         Power pvSurplus = batteryStorageService.determineSolarPowerSurplus();
-        Power pvPower = pvSurplus.isGreaterThan(heatingControlConfig.maxHeatingPower())
-                ? Power.ofWatts(heatingControlConfig.maxHeatingPower())
-                : pvSurplus;
 
         BatteryStatus batteryStatus = batteryStorageService.getCurrentStatus();
         updateBatteryAssistState(rodCurrentTemp, batteryStatus.getBatteryStateOfCharge().getValue());
@@ -149,11 +164,15 @@ public class ManualWaterHeatingService {
                 ? determineAvailableBatteryPower(batteryStatus)
                 : Power.ZERO;
 
-        Power totalPower = pvPower.increase(batteryPower);
+        Power totalPower = pvSurplus.increase(batteryPower);
+        if (totalPower.isGreaterThan(heatingControlConfig.maxHeatingPower())) {
+            totalPower = Power.ofWatts(heatingControlConfig.maxHeatingPower());
+        }
+
         HeatingSource source;
         if (batteryPower.isPositive()) {
             source = HeatingSource.BATTERY;
-        } else if (pvPower.isPositive()) {
+        } else if (pvSurplus.isPositive()) {
             source = HeatingSource.PV;
         } else {
             source = HeatingSource.NONE;
@@ -177,11 +196,26 @@ public class ManualWaterHeatingService {
                 && rodCurrentTemp.getCelsius() < config.heatingRodLowTemperatureThreshold()
                 && batterySocPercent > config.batterySocStartThreshold()) {
             batteryAssistActive.set(true);
+            batteryAssistStartSoc = batterySocPercent;
             log.info("Manual water heating: battery-assisted heating started (rod temp {}, SOC {}%)",
                     rodCurrentTemp, batterySocPercent);
-        } else if (batteryAssistActive.get() && batterySocPercent <= config.batterySocStopThreshold()) {
+            return;
+        }
+
+        if (!batteryAssistActive.get()) {
+            return;
+        }
+
+        boolean reachedAbsoluteFloor = batterySocPercent <= config.batterySocStopThreshold();
+        int maxSocDrop = config.maxBatterySocDropPercent();
+        boolean reachedSessionDropLimit = batterySocPercent <= batteryAssistStartSoc - maxSocDrop;
+
+        if (reachedAbsoluteFloor || reachedSessionDropLimit) {
             batteryAssistActive.set(false);
-            log.info("Manual water heating: battery-assisted heating stopped (SOC reached {}%)", batterySocPercent);
+            log.info(
+                    "Manual water heating: battery-assisted heating stopped (SOC {}%, started at {}%, "
+                            + "absolute floor reached: {}, session drop limit reached: {})",
+                    batterySocPercent, batteryAssistStartSoc, reachedAbsoluteFloor, reachedSessionDropLimit);
         }
     }
 
@@ -197,7 +231,13 @@ public class ManualWaterHeatingService {
                 : headroom;
     }
 
-    private void manageGasFallback() {
+    /**
+     * @return true if gas heating was actively running this session and just reached its
+     *         target - i.e. the gas heating goal was actually accomplished, as opposed to
+     *         gas simply never having been needed
+     */
+    private boolean manageGasFallback() {
+        boolean wasActive = gasAssistActive.get();
         Temperature gasCurrentTemp = gasHeatingService.readHotWaterCurrentTemperature();
         Temperature gasTargetTemp = gasHeatingService.readHotWaterTargetTemperature();
         double shutoffTemp = gasTargetTemp.getCelsius() - config.gasHeatingShutoffTemperatureOffset();
@@ -218,6 +258,8 @@ public class ManualWaterHeatingService {
             }
             currentSource = HeatingSource.NONE;
         }
+
+        return wasActive && !gasAssistActive.get();
     }
 
     private record HeatingDecision(Power power, HeatingSource source) {

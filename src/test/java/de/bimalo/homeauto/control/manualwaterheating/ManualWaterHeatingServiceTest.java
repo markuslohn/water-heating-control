@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -59,6 +60,7 @@ class ManualWaterHeatingServiceTest {
         lenient().when(config.heatingRodLowTemperatureThreshold()).thenReturn(42.0);
         lenient().when(config.batterySocStartThreshold()).thenReturn(65);
         lenient().when(config.batterySocStopThreshold()).thenReturn(50);
+        lenient().when(config.maxBatterySocDropPercent()).thenReturn(10);
         lenient().when(config.maxBatteryHeatingPower()).thenReturn(850);
         lenient().when(config.batteryMaxDischargePower()).thenReturn(1500);
         lenient().when(config.gasHeatingLowTemperatureThreshold()).thenReturn(35.0);
@@ -142,6 +144,21 @@ class ManualWaterHeatingServiceTest {
         verify(heatingRodService).adjustHeating(argThat(p -> p.getWatts() == 2900));
     }
 
+    @Test
+    void manageWaterHeating_capsCombinedPvAndBatteryPowerAtConfiguredMaxHeatingPower() {
+        service.activate();
+        // Rod temp below 42°C and SOC above 65% -> battery assist also triggers
+        when(heatingRodService.readTemperature1()).thenReturn(Temperature.ofCelsius(40.0));
+        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(Power.ofWatts(2500));
+        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus(70, 0));
+
+        service.manageWaterHeating();
+
+        // Without the combined cap this would be 2500 + 850 = 3350 W, which exceeds both
+        // heatingctl.max-heating-power (2900) and the ELWA2 hardware limit (3200)
+        verify(heatingRodService).adjustHeating(argThat(p -> p.getWatts() == 2900));
+    }
+
     // ==================== Battery assist trigger ====================
 
     @Test
@@ -202,15 +219,16 @@ class ManualWaterHeatingServiceTest {
     void manageWaterHeating_continuesBatteryAssist_afterTemperatureRisesAbove42_untilSocDropsTo50() {
         service.activate();
 
-        // Cycle 1: trigger battery assist
+        // Cycle 1: trigger battery assist (SOC starts at 70%)
         when(heatingRodService.readTemperature1()).thenReturn(Temperature.ofCelsius(40.0));
         when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(Power.ZERO);
         when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus(70, 0));
         service.manageWaterHeating();
 
-        // Cycle 2: temperature back above 42°C, SOC still above the 50% stop threshold
+        // Cycle 2: temperature back above 42°C, SOC dropped only 7 points (below both the
+        // 50% absolute floor and the 10-point session drop limit)
         when(heatingRodService.readTemperature1()).thenReturn(Temperature.ofCelsius(45.0));
-        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus(60, 0));
+        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus(63, 0));
         service.manageWaterHeating();
 
         verify(heatingRodService, times(2)).adjustHeating(argThat(p -> p.getWatts() == 850));
@@ -236,20 +254,41 @@ class ManualWaterHeatingServiceTest {
         assertEquals(HeatingSource.NONE, service.getStatus().getSource());
     }
 
-    // ==================== Target reached ====================
-
     @Test
-    void manageWaterHeating_stopsElectricHeating_whenRodTargetReached() {
+    void manageWaterHeating_stopsBatteryAssist_whenSessionSocDropLimitReached_evenAboveAbsoluteFloor() {
         service.activate();
-        when(heatingRodService.readTemperature1()).thenReturn(Temperature.ofCelsius(60.0));
-        when(heatingRodService.readTargetTemperature()).thenReturn(Temperature.ofCelsius(60.0));
+
+        // Cycle 1: trigger battery assist at 85% SOC
+        when(heatingRodService.readTemperature1()).thenReturn(Temperature.ofCelsius(40.0));
+        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(Power.ZERO);
+        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus(85, 0));
+        service.manageWaterHeating();
+
+        // Cycle 2: SOC dropped 10 points to 75% - well above the 50% absolute floor, but
+        // exactly at the configured 10-percentage-point session drop limit
+        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus(75, 0));
         when(gasHeatingService.readHotWaterCurrentTemperature()).thenReturn(Temperature.ofCelsius(40.0));
         when(gasHeatingService.readHotWaterTargetTemperature()).thenReturn(Temperature.ofCelsius(55.0));
-
         service.manageWaterHeating();
 
         verify(heatingRodService).adjustHeating(argThat(p -> p.getWatts() == 0));
+        assertEquals(HeatingSource.NONE, service.getStatus().getSource());
+    }
+
+    // ==================== Target reached ====================
+
+    @Test
+    void manageWaterHeating_stopsElectricHeatingAndDeactivatesManualMode_whenRodTargetReached() {
+        service.activate();
+        when(heatingRodService.readTemperature1()).thenReturn(Temperature.ofCelsius(60.0));
+        when(heatingRodService.readTargetTemperature()).thenReturn(Temperature.ofCelsius(60.0));
+
+        service.manageWaterHeating();
+
+        verify(heatingRodService, atLeastOnce()).adjustHeating(argThat(p -> p.getWatts() == 0));
         verify(batteryStorageService, never()).determineSolarPowerSurplus();
+        verify(heatingControlService).deactivateManualMode();
+        assertFalse(service.getStatus().isActive());
     }
 
     // ==================== Gas fallback ====================
@@ -302,7 +341,7 @@ class ManualWaterHeatingServiceTest {
     }
 
     @Test
-    void manageWaterHeating_stopsGasFallback_atTargetMinusShutoffOffset_beforeTargetIsReached() {
+    void manageWaterHeating_stopsGasFallbackAndDeactivatesManualMode_atTargetMinusShutoffOffset() {
         service.activate();
         when(heatingRodService.readTemperature1()).thenReturn(Temperature.ofCelsius(50.0));
         when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(Power.ZERO);
@@ -318,8 +357,10 @@ class ManualWaterHeatingServiceTest {
         when(gasHeatingService.isHeatingActive()).thenReturn(true);
         service.manageWaterHeating();
 
-        verify(gasHeatingService).deactivateHeating();
+        verify(gasHeatingService, atLeastOnce()).deactivateHeating();
         assertEquals(HeatingSource.NONE, service.getStatus().getSource());
+        verify(heatingControlService).deactivateManualMode();
+        assertFalse(service.getStatus().isActive());
     }
 
     @Test

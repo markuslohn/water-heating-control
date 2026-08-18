@@ -368,7 +368,7 @@
 
         <!-- Manuelle Warmwassererzeugung -->
         <div class="control-box">
-            <h2>🎛️ Manuelle Warmwassererzeugung</h2>
+            <h2>🎛️ Einmalige Warmwassererzeugung</h2>
             <div class="status-item">
                 <span class="status-label">Status:</span>
                 <span class="status-value" id="manual-heating-status">-</span>
@@ -383,8 +383,10 @@
             </div>
             <p style="margin-top: 15px; color: #666; font-size: 0.9em;">
                 Nutzt PV-Überschuss und, wenn die Heizstab-Temperatur unter 42°C fällt und die Batterie über 65%
-                geladen ist, zusätzlich Batterieleistung (max. 850 W, bis Batterie 50% erreicht) – ohne Netzstrom
-                zu ziehen. Ist keine elektrische Leistung verfügbar, springt bei Bedarf die Gasheizung ein.
+                geladen ist, zusätzlich Batterieleistung (max. 850 W, bis Batterie 50% erreicht oder 10 Prozentpunkte
+                SOC verbraucht sind) – ohne Netzstrom zu ziehen. Ist keine elektrische Leistung verfügbar, springt
+                bei Bedarf die Gasheizung ein. Sobald eines der Ziele (Heizstab- oder Gas-Zieltemperatur) erreicht
+                ist, schaltet sich der manuelle Modus automatisch ab.
             </p>
         </div>
 
@@ -448,19 +450,12 @@
             return `${temp.celsius.toFixed(1)}°C`;
         }
 
-        // Hot water availability: each sensor is classified independently into one of
-        // 4 tiers (0=depleted .. 3=sufficient), the worse (lower) tier wins overall.
+        // Hot water availability: based solely on the heating rod temperature
+        // (0=depleted .. 3=sufficient).
         function heatingRodAvailabilityTier(celsius) {
-            if (celsius > 45) return 3;
-            if (celsius >= 35) return 2;
-            if (celsius >= 30) return 1;
-            return 0;
-        }
-
-        function gasHeatingAvailabilityTier(celsius) {
-            if (celsius > 40) return 3;
+            if (celsius > 35) return 3;
             if (celsius >= 30) return 2;
-            if (celsius >= 25) return 1;
+            if (celsius >= 28) return 1;
             return 0;
         }
 
@@ -471,9 +466,8 @@
             { className: 'hotwater-sufficient', text: '🟢 Ausreichend Warmwasser vorhanden' },
         ];
 
-        function updateHotWaterBanner(rodTempCelsius, gasTempCelsius) {
-            const tier = Math.min(heatingRodAvailabilityTier(rodTempCelsius), gasHeatingAvailabilityTier(gasTempCelsius));
-            const level = HOTWATER_LEVELS[tier];
+        function updateHotWaterBanner(rodTempCelsius) {
+            const level = HOTWATER_LEVELS[heatingRodAvailabilityTier(rodTempCelsius)];
             const banner = document.getElementById('hotwater-banner');
             banner.textContent = level.text;
             banner.className = 'hotwater-banner ' + level.className;
@@ -560,7 +554,7 @@
                 const gasHeatingBox = document.getElementById('gasheating-status-box');
                 gasHeatingBox.className = 'status-box ' + (gasHeating.active ? 'status-active' : 'status-inactive');
 
-                updateHotWaterBanner(heating.currentTemperature.celsius, gasHeating.currentTemperature.celsius);
+                updateHotWaterBanner(heating.currentTemperature.celsius);
 
                 // Manual Water Heating Status
                 console.log('[DEBUG] Fetching manual water heating status...');
@@ -597,7 +591,7 @@
                 await fetch('/api/manual-water-heating/start', { method: 'POST' });
                 updateStatus();
             } catch (error) {
-                alert('Fehler beim Starten der manuellen Warmwassererzeugung: ' + error.message);
+                alert('Fehler beim Starten der einmaligen Warmwassererzeugung: ' + error.message);
             }
         }
 
@@ -606,7 +600,7 @@
                 await fetch('/api/manual-water-heating/stop', { method: 'POST' });
                 updateStatus();
             } catch (error) {
-                alert('Fehler beim Stoppen der manuellen Warmwassererzeugung: ' + error.message);
+                alert('Fehler beim Stoppen der einmaligen Warmwassererzeugung: ' + error.message);
             }
         }
 

@@ -144,6 +144,11 @@ manualwaterheating.battery-soc-start-threshold=65
 # Battery SOC (in %) at or below which battery-assisted heating stops
 manualwaterheating.battery-soc-stop-threshold=50
 
+# Maximum SOC drop (in percentage points) from the SOC at session start before
+# battery-assisted heating stops, regardless of the absolute stop threshold above
+# (e.g. starts at 85%, limit 10 -> stops at 75%, even if still above the absolute floor)
+manualwaterheating.max-battery-soc-drop-percent=10
+
 # Maximum power (in watts) the battery may contribute to heating
 manualwaterheating.max-battery-heating-power=850
 
@@ -160,14 +165,16 @@ manualwaterheating.gas-heating-shutoff-temperature-offset=5.0
 
 **How It Works:**
 1. **PV surplus first**: If PV surplus is available, it is used fully for heating (source: `PV`) - not limited to the 850W battery cap.
-2. **Battery assist**: If PV surplus alone isn't enough, and the heating rod temperature drops below 42°C while battery SOC is above 65%, additional battery power is used (source: `BATTERY`), capped at 850W and at whatever headroom remains within the battery's 1500W total discharge capacity (accounting for power already used by the house). Once triggered, battery assist keeps running until the rod's target temperature is reached or SOC drops to 50%, even if the temperature briefly rises back above 42°C.
+2. **Battery assist**: If PV surplus alone isn't enough, and the heating rod temperature drops below 42°C while battery SOC is above 65%, additional battery power is used (source: `BATTERY`), capped at 850W and at whatever headroom remains within the battery's 1500W total discharge capacity (accounting for power already used by the house). Once triggered, battery assist keeps running until the rod's target temperature is reached, SOC drops to the absolute 50% floor, or SOC has dropped by 10 percentage points since the session started (whichever comes first) - even if the temperature briefly rises back above 42°C.
 3. **Grid protection**: If neither PV surplus nor battery headroom is available, no electrical heating happens at all - the heating rod is never powered from the grid.
 4. **Gas fallback**: If no electrical power is available and the gas heating hot water temperature drops below 35°C, gas heating is activated (source: `GAS`) until it reaches its target temperature minus the configured shutoff offset (default 5°C).
+5. **Automatic shutoff**: As soon as one of the defined targets is reached - the heating rod's target temperature, or (while gas heating was actively running) the gas heating target - manual water heating mode switches itself off entirely, resuming automatic PV-surplus control.
 
 **Usage:**
 - Start/stop via the web interface button, or REST API: `POST /api/manual-water-heating/start` / `POST /api/manual-water-heating/stop`
 - Current status: `GET /api/manual-water-heating/status` (active state and current heating source)
 - The heating source is only shown on the dashboard while manual water heating mode is active
+- The mode stops itself automatically once a target is reached (see point 5 above) - it does not need to be stopped manually every time
 
 ### Seasonal Operating Hours
 
