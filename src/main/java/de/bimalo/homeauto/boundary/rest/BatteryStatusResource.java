@@ -30,13 +30,18 @@ public class BatteryStatusResource {
     /**
      * Gets the current battery storage status.
      *
-     * @return current battery status including production, consumption, battery power, grid power and SOC
+     * @return current battery status including production, consumption, battery
+     *         power, grid power and SOC
      */
     @GET
     @Path("/status")
     public BatteryStatus getStatus() {
         log.debug("REST: Getting battery status");
-        return e3dcAdapter.getCurrentStatus();
+        try {
+            return e3dcAdapter.readStatus();
+        } catch (RuntimeException ex) {
+            return e3dcAdapter.getLastKnownStatus().orElseThrow();
+        }
     }
 
     /**

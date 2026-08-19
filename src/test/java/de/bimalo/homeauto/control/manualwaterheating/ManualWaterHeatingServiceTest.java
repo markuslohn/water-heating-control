@@ -26,7 +26,6 @@ import de.bimalo.homeauto.entity.Percentage;
 import de.bimalo.homeauto.entity.Power;
 import de.bimalo.homeauto.entity.Temperature;
 import java.time.Instant;
-import java.time.LocalDateTime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -126,8 +125,7 @@ class ManualWaterHeatingServiceTest {
         service.activate();
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(Temperature.ofCelsius(50.0), Temperature.ofCelsius(60.0), Power.ZERO, Elwa2Status.UNKNOWN, Instant.now())); // above 42°C
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(Power.ofWatts(1000));
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus(70, 0));
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus(70, 0, 1000));
 
         service.manageWaterHeating();
 
@@ -140,8 +138,7 @@ class ManualWaterHeatingServiceTest {
         service.activate();
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(Temperature.ofCelsius(50.0), Temperature.ofCelsius(60.0), Power.ZERO, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(Power.ofWatts(4000));
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus(70, 0));
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus(70, 0, 4000));
 
         service.manageWaterHeating();
 
@@ -154,8 +151,7 @@ class ManualWaterHeatingServiceTest {
         // Rod temp below 42°C and SOC above 65% -> battery assist also triggers
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(Temperature.ofCelsius(40.0), Temperature.ofCelsius(60.0), Power.ZERO, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(Power.ofWatts(2500));
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus(70, 0));
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus(70, 0, 2500));
 
         service.manageWaterHeating();
 
@@ -171,8 +167,7 @@ class ManualWaterHeatingServiceTest {
         service.activate();
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(Temperature.ofCelsius(40.0), Temperature.ofCelsius(60.0), Power.ZERO, Elwa2Status.UNKNOWN, Instant.now())); // below 42°C
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(Power.ZERO);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus(70, 0)); // SOC 70% > 65%, not discharging
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus(70, 0)); // SOC 70% > 65%, not discharging
 
         service.manageWaterHeating();
 
@@ -185,8 +180,7 @@ class ManualWaterHeatingServiceTest {
         service.activate();
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(Temperature.ofCelsius(40.0), Temperature.ofCelsius(60.0), Power.ZERO, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(Power.ZERO);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus(65, 0)); // exactly 65%, not >65%
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus(65, 0)); // exactly 65%, not >65%
 
         service.manageWaterHeating();
 
@@ -199,9 +193,8 @@ class ManualWaterHeatingServiceTest {
         service.activate();
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(Temperature.ofCelsius(40.0), Temperature.ofCelsius(60.0), Power.ZERO, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(Power.ZERO);
         // Battery already discharging 1200W for house consumption -> only 300W headroom left
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus(70, -1200));
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus(70, -1200));
 
         service.manageWaterHeating();
 
@@ -213,9 +206,8 @@ class ManualWaterHeatingServiceTest {
         service.activate();
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(Temperature.ofCelsius(40.0), Temperature.ofCelsius(60.0), Power.ZERO, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(Power.ZERO);
         // Battery already discharging at its 1500W max for house consumption alone
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus(70, -1500));
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus(70, -1500));
         when(vitodensAdapter.readHotWaterCurrentTemperature()).thenReturn(Temperature.ofCelsius(40.0));
         when(vitodensAdapter.readHotWaterTargetTemperature()).thenReturn(Temperature.ofCelsius(55.0));
 
@@ -231,15 +223,14 @@ class ManualWaterHeatingServiceTest {
         // Cycle 1: trigger battery assist (SOC starts at 70%)
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(Temperature.ofCelsius(40.0), Temperature.ofCelsius(60.0), Power.ZERO, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(Power.ZERO);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus(70, 0));
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus(70, 0));
         service.manageWaterHeating();
 
         // Cycle 2: temperature back above 42°C, SOC dropped only 7 points (below both the
         // 50% absolute floor and the 10-point session drop limit)
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(Temperature.ofCelsius(45.0), Temperature.ofCelsius(60.0), Power.ZERO, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus(63, 0));
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus(63, 0));
         service.manageWaterHeating();
 
         verify(elwa2Adapter, times(2)).adjustHeating(argThat(p -> p.getWatts() == 850));
@@ -253,14 +244,13 @@ class ManualWaterHeatingServiceTest {
         // Cycle 1: trigger battery assist
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(Temperature.ofCelsius(40.0), Temperature.ofCelsius(60.0), Power.ZERO, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(Power.ZERO);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus(70, 0));
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus(70, 0));
         service.manageWaterHeating();
 
         // Cycle 2: SOC has dropped to the 50% stop threshold
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(Temperature.ofCelsius(41.0), Temperature.ofCelsius(60.0), Power.ZERO, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus(50, 0));
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus(50, 0));
         service.manageWaterHeating();
 
         verify(elwa2Adapter).adjustHeating(argThat(p -> p.getWatts() == 0));
@@ -274,13 +264,12 @@ class ManualWaterHeatingServiceTest {
         // Cycle 1: trigger battery assist at 85% SOC
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(Temperature.ofCelsius(40.0), Temperature.ofCelsius(60.0), Power.ZERO, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(Power.ZERO);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus(85, 0));
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus(85, 0));
         service.manageWaterHeating();
 
         // Cycle 2: SOC dropped 10 points to 75% - well above the 50% absolute floor, but
         // exactly at the configured 10-percentage-point session drop limit
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus(75, 0));
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus(75, 0));
         when(vitodensAdapter.readHotWaterCurrentTemperature()).thenReturn(Temperature.ofCelsius(40.0));
         when(vitodensAdapter.readHotWaterTargetTemperature()).thenReturn(Temperature.ofCelsius(55.0));
         service.manageWaterHeating();
@@ -300,7 +289,7 @@ class ManualWaterHeatingServiceTest {
         service.manageWaterHeating();
 
         verify(elwa2Adapter, atLeastOnce()).adjustHeating(argThat(p -> p.getWatts() == 0));
-        verify(e3dcAdapter, never()).determineSolarPowerSurplus();
+        verify(e3dcAdapter, never()).readStatus();
         verify(heatingControlService).deactivateManualMode();
         assertFalse(service.getStatus().isActive());
     }
@@ -312,8 +301,7 @@ class ManualWaterHeatingServiceTest {
         service.activate();
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(Temperature.ofCelsius(50.0), Temperature.ofCelsius(60.0), Power.ZERO, Elwa2Status.UNKNOWN, Instant.now())); // no battery trigger
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(Power.ZERO);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus(70, 0));
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus(70, 0));
         when(vitodensAdapter.readHotWaterCurrentTemperature()).thenReturn(Temperature.ofCelsius(30.0));
         when(vitodensAdapter.readHotWaterTargetTemperature()).thenReturn(Temperature.ofCelsius(55.0));
 
@@ -328,8 +316,7 @@ class ManualWaterHeatingServiceTest {
         service.activate();
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(Temperature.ofCelsius(50.0), Temperature.ofCelsius(60.0), Power.ZERO, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(Power.ZERO);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus(70, 0));
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus(70, 0));
         when(vitodensAdapter.readHotWaterCurrentTemperature()).thenReturn(Temperature.ofCelsius(40.0)); // above 35°C
         when(vitodensAdapter.readHotWaterTargetTemperature()).thenReturn(Temperature.ofCelsius(55.0));
 
@@ -344,8 +331,7 @@ class ManualWaterHeatingServiceTest {
         service.activate();
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(Temperature.ofCelsius(50.0), Temperature.ofCelsius(60.0), Power.ZERO, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(Power.ZERO);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus(70, 0));
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus(70, 0));
         when(vitodensAdapter.readHotWaterCurrentTemperature()).thenReturn(Temperature.ofCelsius(55.0));
         when(vitodensAdapter.readHotWaterTargetTemperature()).thenReturn(Temperature.ofCelsius(55.0));
         when(vitodensAdapter.isHeatingActive()).thenReturn(true);
@@ -362,8 +348,7 @@ class ManualWaterHeatingServiceTest {
         service.activate();
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(Temperature.ofCelsius(50.0), Temperature.ofCelsius(60.0), Power.ZERO, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(Power.ZERO);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus(70, 0));
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus(70, 0));
         when(vitodensAdapter.readHotWaterTargetTemperature()).thenReturn(Temperature.ofCelsius(55.0));
 
         // Cycle 1: trigger gas fallback
@@ -388,14 +373,13 @@ class ManualWaterHeatingServiceTest {
         // Cycle 1: gas fallback active
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(Temperature.ofCelsius(50.0), Temperature.ofCelsius(60.0), Power.ZERO, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(Power.ZERO);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus(70, 0));
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus(70, 0));
         when(vitodensAdapter.readHotWaterCurrentTemperature()).thenReturn(Temperature.ofCelsius(30.0));
         when(vitodensAdapter.readHotWaterTargetTemperature()).thenReturn(Temperature.ofCelsius(55.0));
         service.manageWaterHeating();
 
         // Cycle 2: PV surplus becomes available
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(Power.ofWatts(500));
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus(70, 0, 500));
         when(vitodensAdapter.isHeatingActive()).thenReturn(true);
         service.manageWaterHeating();
 
@@ -416,9 +400,13 @@ class ManualWaterHeatingServiceTest {
     }
 
     private BatteryStatus batteryStatus(int socPercent, long batteryWatts) {
+        return batteryStatus(socPercent, batteryWatts, 0);
+    }
+
+    private BatteryStatus batteryStatus(int socPercent, long batteryWatts, long productionWatts) {
         return BatteryStatus.builder()
-                .timestamp(LocalDateTime.now())
-                .productionPower(Power.ZERO)
+                .measuredAt(Instant.now())
+                .productionPower(Power.ofWatts(productionWatts))
                 .consumptionPower(Power.ZERO)
                 .batteryPower(Power.ofWatts(batteryWatts))
                 .gridPower(Power.ZERO)

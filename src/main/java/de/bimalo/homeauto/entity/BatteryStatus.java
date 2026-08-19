@@ -1,7 +1,8 @@
 package de.bimalo.homeauto.entity;
 
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -12,9 +13,7 @@ import lombok.Getter;
 @Builder
 public final class BatteryStatus {
 
-    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss");
-
-    private final LocalDateTime timestamp;
+    private final Instant measuredAt;
 
     private final Power productionPower;
 
@@ -30,11 +29,39 @@ public final class BatteryStatus {
     public String toString() {
         return String.format(
                 "BatteryStatus[time= %s, PV-Power= %s, Battery-Power= %s, Home consumption= %s, Grid-Power= %s, Battery SOC= %s]",
-                timestamp != null ? timestamp.format(FORMATTER) : "null",
+                measuredAt,
                 productionPower,
                 batteryPower,
                 consumptionPower,
                 gridPower,
                 batteryStateOfCharge);
+    }
+
+    /**
+     * Determines the pure solar power surplus available.
+     * Only counts actual solar production, not battery discharge.
+     *
+     * @return Power surplus from solar only (battery discharge is not counted)
+     */
+    public Power determineSolarPowerSurplus() {
+        // Base solar surplus: Production - Consumption
+        Power surplusPower = productionPower.reduce(consumptionPower);
+
+        // If battery is charging, this solar power is not available for other use
+        if (batteryPower.isPositive()) {
+            surplusPower = surplusPower.reduce(batteryPower);
+        }
+
+        // If battery is discharging (negative), we ignore it - it's not solar power
+        if (surplusPower.isNegative()) {
+            return Power.ofWatts(0);
+        } else {
+            return surplusPower;
+        }
+    }
+
+    public boolean isOlderThan(Duration maximumAge, Clock clock) {
+        return !measuredAt.plus(maximumAge)
+                .isAfter(clock.instant());
     }
 }

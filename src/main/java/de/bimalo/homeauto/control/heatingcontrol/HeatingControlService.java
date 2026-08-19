@@ -249,8 +249,8 @@ public class HeatingControlService {
      *         heating
      */
     private Power checkSurplusPower(Power currentHeatingPower) {
-        BatteryStatus batteryStatus = e3dcAdapter.getCurrentStatus();
-        Power baseSurplus = e3dcAdapter.determineSolarPowerSurplus();
+        BatteryStatus batteryStatus = e3dcAdapter.readStatus();
+        Power baseSurplus = batteryStatus.determineSolarPowerSurplus();
         PowerCalculationContext ctx = new PowerCalculationContext(batteryStatus, currentHeatingPower);
 
         Power adjustedSurplus = calculateAdjustedSurplus(ctx);

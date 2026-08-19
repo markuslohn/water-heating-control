@@ -40,7 +40,6 @@ public class Elwa2Adapter {
     @Inject
     public Elwa2Adapter(Elwa2Config config) {
         this(config, new Elwa2ModbusClient(config.modbus().host(), config.modbus().port()));
-        this.config = config;
     }
 
     Elwa2Adapter(Elwa2Config config, Elwa2ModbusClient modbusClient) {

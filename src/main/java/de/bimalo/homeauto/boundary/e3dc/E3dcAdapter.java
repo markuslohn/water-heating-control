@@ -1,16 +1,16 @@
 package de.bimalo.homeauto.boundary.e3dc;
 
 import de.bimalo.homeauto.entity.BatteryStatus;
-import de.bimalo.homeauto.entity.Percentage;
-import de.bimalo.homeauto.entity.Power;
-import io.smallrye.faulttolerance.api.CircuitBreakerName;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
+
+import java.time.Instant;
+import java.util.Optional;
+
 import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
-import org.eclipse.microprofile.faulttolerance.Fallback;
 import org.eclipse.microprofile.faulttolerance.Timeout;
 
 /**
@@ -23,19 +23,16 @@ import org.eclipse.microprofile.faulttolerance.Timeout;
 public class E3dcAdapter {
 
     private final E3dcModbusClient modbusClient;
-    private final E3dcConfig config;
 
-    // Cached values for fallback when circuit is open
-    private volatile Power lastKnownGridPower = Power.ofWatts(0);
-    private volatile Power lastKnownBatteryPower = Power.ofWatts(0);
-    private volatile Power lastKnownProductionPower = Power.ofWatts(0);
-    private volatile Power lastKnownConsumptionPower = Power.ofWatts(1000);
-    private volatile Percentage lastKnownBatteryStateOfCharge = Percentage.of(50);
+    private volatile BatteryStatus lastKnownStatus;
 
     @Inject
     public E3dcAdapter(E3dcConfig config) {
-        this.config = config;
-        this.modbusClient = new E3dcModbusClient(config.modbus().host(), config.modbus().port());
+        this(config, new E3dcModbusClient(config.modbus().host(), config.modbus().port()));
+    }
+
+    public E3dcAdapter(E3dcConfig config, E3dcModbusClient modbusClient) {
+        this.modbusClient = modbusClient;
     }
 
     @PostConstruct
@@ -48,142 +45,25 @@ public class E3dcAdapter {
         modbusClient.shutdown();
     }
 
-    public BatteryStatus getCurrentStatus() {
-        return BatteryStatus.builder()
-                .timestamp(java.time.LocalDateTime.now())
-                .productionPower(readProductionPower())
-                .consumptionPower(readHouseConsumptionPower())
-                .batteryPower(readBatteryPower())
-                .gridPower(readGridPower())
-                .batteryStateOfCharge(readBatteryStateOfCharge())
+    @CircuitBreaker(requestVolumeThreshold = 4, failureRatio = 0.5, delay = 5000, successThreshold = 2)
+    @Timeout(6000)
+    public BatteryStatus readStatus() {
+        BatteryStatus status = BatteryStatus.builder()
+                .measuredAt(Instant.now())
+                .productionPower(modbusClient.readProductionPower())
+                .consumptionPower(modbusClient.readHouseConsumptionPower())
+                .batteryPower(modbusClient.readBatteryPower())
+                .gridPower(modbusClient.readGridPower())
+                .batteryStateOfCharge(
+                        modbusClient.readBatteryStateOfCharge())
                 .build();
+
+        lastKnownStatus = status;
+        return status;
     }
 
-    /**
-     * Determines the pure solar power surplus available.
-     * Only counts actual solar production, not battery discharge.
-     *
-     * @return Power surplus from solar only (battery discharge is not counted)
-     */
-    public Power determineSolarPowerSurplus() {
-        Power productionPower = readProductionPower();
-        Power houseConsumptionPower = readHouseConsumptionPower();
-        Power batteryPower = readBatteryPower();
-
-        // Base solar surplus: Production - Consumption
-        Power surplusPower = productionPower.reduce(houseConsumptionPower);
-
-        // If battery is charging, this solar power is not available for other use
-        if (batteryPower.isPositive()) {
-            surplusPower = surplusPower.reduce(batteryPower);
-        }
-        // If battery is discharging (negative), we ignore it - it's not solar power
-
-        if (surplusPower.isNegative()) {
-            return Power.ofWatts(0);
-        } else {
-            return surplusPower;
-        }
-    }
-
-    @CircuitBreaker(
-            requestVolumeThreshold = 4,
-            failureRatio = 0.5,
-            delay = 5000,
-            successThreshold = 2)
-    @Timeout(value = 3000)
-    @Fallback(fallbackMethod = "readGridPowerFallback")
-    @CircuitBreakerName("e3dc-grid-power")
-    Power readGridPower() {
-        Power result = modbusClient.readGridPower();
-        lastKnownGridPower = result;
-        return result;
-    }
-
-    Power readGridPowerFallback() {
-        log.warn("Circuit breaker open for grid power read, returning last known value: {} W",
-                lastKnownGridPower.getWatts());
-        return lastKnownGridPower;
-    }
-
-    @CircuitBreaker(
-            requestVolumeThreshold = 4,
-            failureRatio = 0.5,
-            delay = 5000,
-            successThreshold = 2)
-    @Timeout(value = 3000)
-    @Fallback(fallbackMethod = "readBatteryPowerFallback")
-    @CircuitBreakerName("e3dc-battery-power")
-    Power readBatteryPower() {
-        Power result = modbusClient.readBatteryPower();
-        lastKnownBatteryPower = result;
-        return result;
-    }
-
-    Power readBatteryPowerFallback() {
-        log.warn("Circuit breaker open for battery power read, returning last known value: {} W",
-                lastKnownBatteryPower.getWatts());
-        return lastKnownBatteryPower;
-    }
-
-    @CircuitBreaker(
-            requestVolumeThreshold = 4,
-            failureRatio = 0.5,
-            delay = 5000,
-            successThreshold = 2)
-    @Timeout(value = 3000)
-    @Fallback(fallbackMethod = "readProductionPowerFallback")
-    @CircuitBreakerName("e3dc-production-power")
-    Power readProductionPower() {
-        Power result = modbusClient.readProductionPower();
-        lastKnownProductionPower = result;
-        return result;
-    }
-
-    Power readProductionPowerFallback() {
-        log.warn("Circuit breaker open for production power read, returning last known value: {} W",
-                lastKnownProductionPower.getWatts());
-        return lastKnownProductionPower;
-    }
-
-    @CircuitBreaker(
-            requestVolumeThreshold = 4,
-            failureRatio = 0.5,
-            delay = 5000,
-            successThreshold = 2)
-    @Timeout(value = 3000)
-    @Fallback(fallbackMethod = "readHouseConsumptionPowerFallback")
-    @CircuitBreakerName("e3dc-consumption-power")
-    Power readHouseConsumptionPower() {
-        Power result = modbusClient.readHouseConsumptionPower();
-        lastKnownConsumptionPower = result;
-        return result;
-    }
-
-    Power readHouseConsumptionPowerFallback() {
-        log.warn("Circuit breaker open for consumption power read, returning last known value: {} W",
-                lastKnownConsumptionPower.getWatts());
-        return lastKnownConsumptionPower;
-    }
-
-    @CircuitBreaker(
-            requestVolumeThreshold = 4,
-            failureRatio = 0.5,
-            delay = 5000,
-            successThreshold = 2)
-    @Timeout(value = 3000)
-    @Fallback(fallbackMethod = "readBatteryStateOfChargeFallback")
-    @CircuitBreakerName("e3dc-battery-soc")
-    Percentage readBatteryStateOfCharge() {
-        Percentage result = modbusClient.readBatteryStateOfCharge();
-        lastKnownBatteryStateOfCharge = result;
-        return result;
-    }
-
-    Percentage readBatteryStateOfChargeFallback() {
-        log.warn("Circuit breaker open for battery SOC read, returning last known value: {}%",
-                lastKnownBatteryStateOfCharge.getValue());
-        return lastKnownBatteryStateOfCharge;
+    public Optional<BatteryStatus> getLastKnownStatus() {
+        return Optional.ofNullable(lastKnownStatus);
     }
 
 }

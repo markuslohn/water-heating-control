@@ -157,9 +157,8 @@ public class ManualWaterHeatingService {
             return new HeatingDecision(Power.ZERO, HeatingSource.NONE);
         }
 
-        Power pvSurplus = e3dcAdapter.determineSolarPowerSurplus();
-
-        BatteryStatus batteryStatus = e3dcAdapter.getCurrentStatus();
+        BatteryStatus batteryStatus = e3dcAdapter.readStatus();
+        Power pvSurplus = batteryStatus.determineSolarPowerSurplus();
         updateBatteryAssistState(rodCurrentTemp, batteryStatus.getBatteryStateOfCharge().getValue());
 
         Power batteryPower = batteryAssistActive.get()

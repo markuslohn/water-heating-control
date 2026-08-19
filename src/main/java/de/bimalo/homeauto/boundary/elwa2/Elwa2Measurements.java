@@ -22,4 +22,8 @@ public record Elwa2Measurements(
         return currentPower.isPositive();
     }
 
+    public boolean isOlderThan(Duration maximumAge, Clock clock) {
+        return !measuredAt.plus(maximumAge)
+                .isAfter(clock.instant());
+    }
 }

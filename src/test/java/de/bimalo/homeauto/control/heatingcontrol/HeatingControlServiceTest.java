@@ -22,7 +22,6 @@ import de.bimalo.homeauto.entity.Season;
 import de.bimalo.homeauto.entity.Temperature;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.LocalDateTime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -115,7 +114,6 @@ class HeatingControlServiceTest {
         // Given
         Temperature currentTemp = Temperature.ofCelsius(50.0);
         Temperature targetTemp = Temperature.ofCelsius(68.0);
-        Power baseSurplus = Power.ofWatts(50); // Below minimum of 100W
         Power currentHeatingPower = Power.ofWatts(200);
         // New logic: adjustedSurplus = production - (consumption - currentHeating)
         // For 50W result: production=250, consumption=200 → 250 - (200-200) = 250W
@@ -125,8 +123,7 @@ class HeatingControlServiceTest {
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
 
         // When
         heatingControlService.controlHeatingSummer();
@@ -142,7 +139,6 @@ class HeatingControlServiceTest {
         // Given
         Temperature currentTemp = Temperature.ofCelsius(50.0);
         Temperature targetTemp = Temperature.ofCelsius(68.0);
-        Power baseSurplus = Power.ofWatts(-200); // Negative surplus
         Power currentHeatingPower = Power.ofWatts(150); // Current heating
         // New logic: adjustedSurplus = production - (consumption - currentHeating)
         // For negative result: production=100, consumption=300 → 100 - (300-150) = -50W
@@ -152,8 +148,7 @@ class HeatingControlServiceTest {
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
 
         // When
         heatingControlService.controlHeatingSummer();
@@ -168,7 +163,6 @@ class HeatingControlServiceTest {
         // Given
         Temperature currentTemp = Temperature.ofCelsius(50.0);
         Temperature targetTemp = Temperature.ofCelsius(68.0);
-        Power baseSurplus = Power.ofWatts(1500);
         Power currentHeatingPower = Power.ofWatts(200);
         // New logic: adjustedSurplus = production - (consumption - currentHeating)
         // For 1700W: production=1900, consumption=200 → 1900 - (200-200) = 1900W
@@ -178,8 +172,7 @@ class HeatingControlServiceTest {
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
 
         // When
         heatingControlService.controlHeatingSummer();
@@ -194,7 +187,6 @@ class HeatingControlServiceTest {
         // Given
         Temperature currentTemp = Temperature.ofCelsius(50.0);
         Temperature targetTemp = Temperature.ofCelsius(68.0);
-        Power baseSurplus = Power.ofWatts(3500); // Exceeds max of 3000W
         Power currentHeatingPower = Power.ofWatts(200);
         // New logic: production=3700, consumption=200 → 3700 - (200-200) = 3700W
         // heating priority: availableForHeating = 3700 + 0 = 3700W, limited to 2900W
@@ -202,8 +194,7 @@ class HeatingControlServiceTest {
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
 
         // When
         heatingControlService.controlHeatingSummer();
@@ -218,15 +209,13 @@ class HeatingControlServiceTest {
         // Given
         Temperature currentTemp = Temperature.ofCelsius(50.0);
         Temperature targetTemp = Temperature.ofCelsius(68.0);
-        Power baseSurplus = Power.ofWatts(2800);
         Power currentHeatingPower = Power.ofWatts(200);
         // New logic: production=2900, consumption=200 → 2900 - (200-200) = 2900W
         BatteryStatus batteryStatus = createBatteryStatus(70, 2900, 200, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
 
         // When
         heatingControlService.controlHeatingSummer();
@@ -241,15 +230,13 @@ class HeatingControlServiceTest {
         // Given
         Temperature currentTemp = Temperature.ofCelsius(50.0);
         Temperature targetTemp = Temperature.ofCelsius(68.0);
-        Power baseSurplus = Power.ofWatts(1200);
         Power currentHeatingPower = Power.ofWatts(0); // Not currently heating
         // New logic: production=1200, consumption=0 → 1200 - 0 = 1200W
         BatteryStatus batteryStatus = createBatteryStatus(70, 1200, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
 
         // When
         heatingControlService.controlHeatingSummer();
@@ -278,15 +265,13 @@ class HeatingControlServiceTest {
         // Given
         Temperature currentTemp = Temperature.ofCelsius(50.0);
         Temperature targetTemp = Temperature.ofCelsius(68.0);
-        Power baseSurplus = Power.ofWatts(50);
         Power currentHeatingPower = Power.ofWatts(50);
         // New logic: production=100, consumption=50 → 100 - (50-50) = 100W
         BatteryStatus batteryStatus = createBatteryStatus(70, 100, 50, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
 
         // When
         heatingControlService.controlHeatingSummer();
@@ -301,15 +286,13 @@ class HeatingControlServiceTest {
         // Given
         Temperature currentTemp = Temperature.ofCelsius(50.0);
         Temperature targetTemp = Temperature.ofCelsius(68.0);
-        Power baseSurplus = Power.ofWatts(49);
         Power currentHeatingPower = Power.ofWatts(50);
         // New logic: production=99, consumption=50 → 99 - (50-50) = 99W
         BatteryStatus batteryStatus = createBatteryStatus(70, 99, 50, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
 
         // When
         heatingControlService.controlHeatingSummer();
@@ -325,10 +308,9 @@ class HeatingControlServiceTest {
         // PV: 677W, Consumption: 3590W, Battery discharge: 1644W, Grid: 1269W
         Temperature currentTemp = Temperature.ofCelsius(50.0);
         Temperature targetTemp = Temperature.ofCelsius(68.0);
-        Power baseSurplus = Power.ofWatts(0); // PV - Consumption = negative, so 0
         Power currentHeatingPower = Power.ofWatts(1000); // Currently heating
         BatteryStatus batteryStatus = BatteryStatus.builder()
-                .timestamp(LocalDateTime.now())
+                .measuredAt(Instant.now())
                 .productionPower(Power.ofWatts(677))
                 .consumptionPower(Power.ofWatts(3590))
                 .batteryPower(Power.ofWatts(-1644)) // Discharging (negative)
@@ -338,8 +320,7 @@ class HeatingControlServiceTest {
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
 
         // When
         heatingControlService.controlHeatingSummer();
@@ -358,7 +339,6 @@ class HeatingControlServiceTest {
         // Given
         Temperature currentTemp = Temperature.ofCelsius(50.0);
         Temperature targetTemp = Temperature.ofCelsius(68.0);
-        Power baseSurplus = Power.ofWatts(2000);
         Power currentHeatingPower = Power.ofWatts(0);
         // New logic: production=2000, consumption=0 → 2000 - 0 = 2000W
         // Battery priority: 2000 - 1000 (reserved) = 1000W
@@ -366,8 +346,7 @@ class HeatingControlServiceTest {
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
         when(config.batteryPriorityEnabled()).thenReturn(true);
         when(config.batteryPriorityThreshold()).thenReturn(60);
         when(config.batteryReservedPower()).thenReturn(1000);
@@ -385,15 +364,13 @@ class HeatingControlServiceTest {
         // Given
         Temperature currentTemp = Temperature.ofCelsius(50.0);
         Temperature targetTemp = Temperature.ofCelsius(68.0);
-        Power baseSurplus = Power.ofWatts(2000);
         Power currentHeatingPower = Power.ofWatts(0);
         // New logic: production=2000, consumption=0 → 2000W
         BatteryStatus batteryStatus = createBatteryStatus(70, 2000, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
         when(config.batteryPriorityEnabled()).thenReturn(true);
         when(config.batteryPriorityThreshold()).thenReturn(60);
 
@@ -410,15 +387,13 @@ class HeatingControlServiceTest {
         // Given
         Temperature currentTemp = Temperature.ofCelsius(50.0);
         Temperature targetTemp = Temperature.ofCelsius(68.0);
-        Power baseSurplus = Power.ofWatts(2000);
         Power currentHeatingPower = Power.ofWatts(0);
         // New logic: production=2000, consumption=0 → 2000W
         BatteryStatus batteryStatus = createBatteryStatus(50, 2000, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
         when(config.batteryPriorityEnabled()).thenReturn(false); // Disabled in config
 
         // When
@@ -434,7 +409,6 @@ class HeatingControlServiceTest {
         // Given
         Temperature currentTemp = Temperature.ofCelsius(50.0);
         Temperature targetTemp = Temperature.ofCelsius(68.0);
-        Power baseSurplus = Power.ofWatts(800); // Less than reserved power
         Power currentHeatingPower = Power.ofWatts(0);
         // New logic: production=800, consumption=0 → 800W
         // Battery priority: 800 - 1000 = -200W → 0W
@@ -442,8 +416,7 @@ class HeatingControlServiceTest {
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
         when(config.batteryPriorityEnabled()).thenReturn(true);
         when(config.batteryPriorityThreshold()).thenReturn(60);
         when(config.batteryReservedPower()).thenReturn(1000);
@@ -461,7 +434,6 @@ class HeatingControlServiceTest {
         // Given
         Temperature currentTemp = Temperature.ofCelsius(50.0);
         Temperature targetTemp = Temperature.ofCelsius(68.0);
-        Power baseSurplus = Power.ofWatts(1500);
         Power currentHeatingPower = Power.ofWatts(500); // Currently heating
         // New logic: production=2000, consumption=500 → 2000 - (500-500) = 2000W
         // Battery priority: 2000 - 1000 = 1000W
@@ -469,8 +441,7 @@ class HeatingControlServiceTest {
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
         when(config.batteryPriorityEnabled()).thenReturn(true);
         when(config.batteryPriorityThreshold()).thenReturn(60);
         when(config.batteryReservedPower()).thenReturn(1000);
@@ -488,15 +459,13 @@ class HeatingControlServiceTest {
         // Given
         Temperature currentTemp = Temperature.ofCelsius(50.0);
         Temperature targetTemp = Temperature.ofCelsius(68.0);
-        Power baseSurplus = Power.ofWatts(2000);
         Power currentHeatingPower = Power.ofWatts(0);
         // New logic: production=2000, consumption=0 → 2000W
         BatteryStatus batteryStatus = createBatteryStatus(60, 2000, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
         when(config.batteryPriorityEnabled()).thenReturn(true);
         when(config.batteryPriorityThreshold()).thenReturn(60);
 
@@ -513,15 +482,13 @@ class HeatingControlServiceTest {
         // Given
         Temperature currentTemp = Temperature.ofCelsius(50.0);
         Temperature targetTemp = Temperature.ofCelsius(68.0);
-        Power baseSurplus = Power.ofWatts(2000);
         Power currentHeatingPower = Power.ofWatts(0);
         // New logic: production=2000, consumption=0 → 2000W
         BatteryStatus batteryStatus = createBatteryStatus(59, 2000, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
         when(config.batteryPriorityEnabled()).thenReturn(true);
         when(config.batteryPriorityThreshold()).thenReturn(60);
         when(config.batteryReservedPower()).thenReturn(1000);
@@ -539,7 +506,6 @@ class HeatingControlServiceTest {
         // Given
         Temperature currentTemp = Temperature.ofCelsius(50.0);
         Temperature targetTemp = Temperature.ofCelsius(68.0);
-        Power baseSurplus = Power.ofWatts(5000); // Very high surplus
         Power currentHeatingPower = Power.ofWatts(0);
         // New logic: production=5000, consumption=0 → 5000W
         // Battery priority: 5000 - 1000 = 4000W, limited to max 3000W
@@ -547,8 +513,7 @@ class HeatingControlServiceTest {
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
         when(config.batteryPriorityEnabled()).thenReturn(true);
         when(config.batteryPriorityThreshold()).thenReturn(60);
         when(config.batteryReservedPower()).thenReturn(1000);
@@ -568,15 +533,13 @@ class HeatingControlServiceTest {
         // Given
         Temperature currentTemp = Temperature.ofCelsius(50.0);
         Temperature targetTemp = Temperature.ofCelsius(68.0);
-        Power baseSurplus = Power.ofWatts(2000);
         Power currentHeatingPower = Power.ofWatts(0);
         // New logic: production=2000, consumption=0 → 2000W
         BatteryStatus batteryStatus = createBatteryStatus(50, 2000, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
         when(config.batteryPriorityEnabled()).thenReturn(true);
         // batteryPriorityThreshold and batteryReservedPower not mocked - not used when
         // override is active
@@ -595,15 +558,13 @@ class HeatingControlServiceTest {
         // Given
         Temperature currentTemp = Temperature.ofCelsius(50.0);
         Temperature targetTemp = Temperature.ofCelsius(68.0);
-        Power baseSurplus = Power.ofWatts(2000);
         Power currentHeatingPower = Power.ofWatts(0);
         // New logic: production=2000, consumption=0 → 2000W
         BatteryStatus batteryStatus = createBatteryStatus(50, 2000, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
         when(config.batteryPriorityEnabled()).thenReturn(true);
         when(config.batteryPriorityThreshold()).thenReturn(60);
         when(config.batteryReservedPower()).thenReturn(1000);
@@ -726,14 +687,12 @@ class HeatingControlServiceTest {
 
         // Now temperature drops to 57°C (below restart threshold of 58°C)
         Temperature restartTemp = Temperature.ofCelsius(57.0);
-        Power baseSurplus = Power.ofWatts(2000);
         // New logic: production=2000, consumption=0 → 2000W
         BatteryStatus batteryStatus = createBatteryStatus(70, 2000, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(restartTemp, targetTemp, Power.ofWatts(0), Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
 
         // When
         heatingControlService.controlHeatingSummer();
@@ -747,15 +706,13 @@ class HeatingControlServiceTest {
         // Given
         Temperature currentTemp = Temperature.ofCelsius(50.0);
         Temperature targetTemp = Temperature.ofCelsius(68.0);
-        Power baseSurplus = Power.ofWatts(1500);
         Power currentHeatingPower = Power.ofWatts(0);
         // New logic: production=1500, consumption=0 → 1500W
         BatteryStatus batteryStatus = createBatteryStatus(70, 1500, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
         when(config.temperatureHysteresis()).thenReturn(10.0);
 
         // When
@@ -778,14 +735,12 @@ class HeatingControlServiceTest {
 
         // Temperature at 64°C (above restart threshold of 63°C with 5°C hysteresis)
         Temperature stillCoolingTemp = Temperature.ofCelsius(64.0);
-        Power baseSurplus = Power.ofWatts(2000);
         // New logic: production=2000, consumption=0 → 2000W
         BatteryStatus batteryStatus = createBatteryStatus(70, 2000, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(stillCoolingTemp, targetTemp, Power.ofWatts(0), Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
 
         // When
         heatingControlService.controlHeatingSummer();
@@ -854,14 +809,12 @@ class HeatingControlServiceTest {
         // Given: Manual mode was active, then deactivated
         Temperature currentTemp = Temperature.ofCelsius(50.0);
         Temperature targetTemp = Temperature.ofCelsius(68.0);
-        Power baseSurplus = Power.ofWatts(1500);
         Power currentHeatingPower = Power.ofWatts(0);
         BatteryStatus batteryStatus = createBatteryStatus(70, 1500, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
 
         // When: Manual mode is activated and then deactivated
         heatingControlService.activateManualMode();
@@ -878,14 +831,12 @@ class HeatingControlServiceTest {
         // Given: Normal conditions, manual mode NOT active
         Temperature currentTemp = Temperature.ofCelsius(50.0);
         Temperature targetTemp = Temperature.ofCelsius(68.0);
-        Power baseSurplus = Power.ofWatts(1000);
         Power currentHeatingPower = Power.ofWatts(0);
         BatteryStatus batteryStatus = createBatteryStatus(70, 1000, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
 
         // When: Control runs without manual mode
         heatingControlService.controlHeatingSummer();
@@ -993,14 +944,12 @@ class HeatingControlServiceTest {
         // Given: 2000W available, 5% reduction should result in 1900W
         Temperature currentTemp = Temperature.ofCelsius(50.0);
         Temperature targetTemp = Temperature.ofCelsius(68.0);
-        Power baseSurplus = Power.ofWatts(2000);
         Power currentHeatingPower = Power.ofWatts(0);
         BatteryStatus batteryStatus = createBatteryStatus(70, 2000, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
         when(config.solarPowerReductionPercent()).thenReturn(5);
 
         // When
@@ -1015,14 +964,12 @@ class HeatingControlServiceTest {
         // Given: 2000W available, 0% reduction should result in 2000W
         Temperature currentTemp = Temperature.ofCelsius(50.0);
         Temperature targetTemp = Temperature.ofCelsius(68.0);
-        Power baseSurplus = Power.ofWatts(2000);
         Power currentHeatingPower = Power.ofWatts(0);
         BatteryStatus batteryStatus = createBatteryStatus(70, 2000, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
         when(config.solarPowerReductionPercent()).thenReturn(0);
 
         // When
@@ -1037,14 +984,12 @@ class HeatingControlServiceTest {
         // Given: 2000W available, 10% reduction should result in 1800W
         Temperature currentTemp = Temperature.ofCelsius(50.0);
         Temperature targetTemp = Temperature.ofCelsius(68.0);
-        Power baseSurplus = Power.ofWatts(2000);
         Power currentHeatingPower = Power.ofWatts(0);
         BatteryStatus batteryStatus = createBatteryStatus(70, 2000, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
         when(config.solarPowerReductionPercent()).thenReturn(10);
 
         // When
@@ -1060,14 +1005,12 @@ class HeatingControlServiceTest {
         // Order: checkSurplusPower applies reduction first, then max limit is applied
         Temperature currentTemp = Temperature.ofCelsius(50.0);
         Temperature targetTemp = Temperature.ofCelsius(68.0);
-        Power baseSurplus = Power.ofWatts(4000);
         Power currentHeatingPower = Power.ofWatts(0);
         BatteryStatus batteryStatus = createBatteryStatus(70, 4000, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
         when(config.solarPowerReductionPercent()).thenReturn(5);
 
         // When
@@ -1082,14 +1025,12 @@ class HeatingControlServiceTest {
         // Given: 150W available (not currently heating), 40% reduction = 90W < 100W minimum
         Temperature currentTemp = Temperature.ofCelsius(50.0);
         Temperature targetTemp = Temperature.ofCelsius(68.0);
-        Power baseSurplus = Power.ofWatts(150);
         Power currentHeatingPower = Power.ofWatts(0); // Not currently heating
         BatteryStatus batteryStatus = createBatteryStatus(70, 150, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
         when(config.solarPowerReductionPercent()).thenReturn(40); // 150 - 40% = 90W < 100W min
 
         // When
@@ -1105,14 +1046,12 @@ class HeatingControlServiceTest {
         // Then 5% reduction → 1900W
         Temperature currentTemp = Temperature.ofCelsius(50.0);
         Temperature targetTemp = Temperature.ofCelsius(68.0);
-        Power baseSurplus = Power.ofWatts(3000);
         Power currentHeatingPower = Power.ofWatts(0);
         BatteryStatus batteryStatus = createBatteryStatus(50, 3000, 0, 0); // SOC below threshold
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
-        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
+        when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
         when(config.batteryPriorityEnabled()).thenReturn(true);
         when(config.batteryPriorityThreshold()).thenReturn(60);
         when(config.batteryReservedPower()).thenReturn(1000);
@@ -1141,7 +1080,7 @@ class HeatingControlServiceTest {
     private BatteryStatus createBatteryStatus(int socPercent, long productionWatts, long consumptionWatts,
             long batteryWatts) {
         return BatteryStatus.builder()
-                .timestamp(LocalDateTime.now())
+                .measuredAt(Instant.now())
                 .productionPower(Power.ofWatts(productionWatts))
                 .consumptionPower(Power.ofWatts(consumptionWatts))
                 .batteryPower(Power.ofWatts(batteryWatts))
