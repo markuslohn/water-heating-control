@@ -1,6 +1,7 @@
 package de.bimalo.homeauto.boundary.elwa2;
 
 import de.bimalo.homeauto.boundary.modbus.AbstractModbusClient;
+import de.bimalo.homeauto.boundary.modbus.ModbusClientException;
 import de.bimalo.homeauto.entity.DeviceInfo;
 import de.bimalo.homeauto.entity.Power;
 import de.bimalo.homeauto.entity.Temperature;
@@ -14,8 +15,7 @@ public final class Elwa2ModbusClient extends AbstractModbusClient {
     /**
      * Maximum power supported by the ELWA2 heating rod in watts.
      */
-    public static final int MAX_POWER_WATTS = 3200;
-
+    public static final int MAX_POWER_WATTS = 3000;
     private static final Power MAX_POWER = Power.ofWatts(MAX_POWER_WATTS);
 
     public Elwa2ModbusClient(String host, int port) {
@@ -74,7 +74,7 @@ public final class Elwa2ModbusClient extends AbstractModbusClient {
         return Power.ofWatts(this.readUnsignedInteger(Elwa2Register.MAX_POWER.getAddress()));
     }
 
-    public Duration readPowerTimeout() {
+    public Duration readPowerCommandTimeout() {
         return Duration.ofSeconds(this.readUnsignedInteger(Elwa2Register.POWER_TIMEOUT.getAddress()));
     }
 

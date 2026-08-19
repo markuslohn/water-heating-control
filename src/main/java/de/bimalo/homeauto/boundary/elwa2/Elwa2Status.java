@@ -4,7 +4,7 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
 /**
- * Betriebsstatus des ELWA2 Heizstabs.
+ * Operating status for ELWA2 heating rod.
  */
 @Getter
 @RequiredArgsConstructor
@@ -32,7 +32,8 @@ public enum Elwa2Status {
      * Konvertiert einen Rohwert in einen Elwa2Status.
      *
      * @param value der Rohwert aus dem Modbus-Register
-     * @return den entsprechenden Status, oder UNKNOWN wenn der Wert nicht definiert ist
+     * @return den entsprechenden Status, oder UNKNOWN wenn der Wert nicht definiert
+     *         ist
      */
     public static Elwa2Status fromValue(int value) {
         for (Elwa2Status status : values()) {

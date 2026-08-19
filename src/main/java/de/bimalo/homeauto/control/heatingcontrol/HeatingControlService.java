@@ -2,6 +2,7 @@ package de.bimalo.homeauto.control.heatingcontrol;
 
 import de.bimalo.homeauto.boundary.e3dc.E3dcAdapter;
 import de.bimalo.homeauto.boundary.elwa2.Elwa2Adapter;
+import de.bimalo.homeauto.boundary.elwa2.Elwa2Measurements;
 import de.bimalo.homeauto.entity.BatteryStatus;
 import de.bimalo.homeauto.entity.Power;
 import de.bimalo.homeauto.entity.Season;
@@ -102,7 +103,7 @@ public class HeatingControlService {
         try {
             // Read current heating power once per control cycle to avoid multiple service
             // calls
-            Power currentHeatingPower = elwa2Adapter.readPower();
+            Power currentHeatingPower = elwa2Adapter.readMeasurements().currentPower();
             TemperatureCheck tempCheck = checkTemperature();
 
             // Manual mode: automatic control is fully suspended. An external controller
@@ -163,8 +164,9 @@ public class HeatingControlService {
      * @return TemperatureCheck containing current and target temperatures
      */
     private TemperatureCheck checkTemperature() {
-        Temperature currentTemperature = elwa2Adapter.readTemperature1();
-        Temperature targetTemperature = elwa2Adapter.readTargetTemperature();
+        Elwa2Measurements measurements = elwa2Adapter.readMeasurements();
+        Temperature currentTemperature = measurements.currentTemperature();
+        Temperature targetTemperature = measurements.targetTemperature();
 
         log.debug("Current temperature: {}°C, Target temperature: {}°C",
                 currentTemperature.getCelsius(), targetTemperature.getCelsius());

@@ -2,15 +2,20 @@ package de.bimalo.homeauto.boundary.elwa2;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.bimalo.homeauto.boundary.modbus.ModbusClientException;
 import de.bimalo.homeauto.entity.Power;
 import de.bimalo.homeauto.entity.Temperature;
 import java.time.Duration;
+import java.time.Instant;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,41 +40,48 @@ class Elwa2AdapterTest {
     @BeforeEach
     void setUp() {
         service = new Elwa2Adapter(config, modbusClient);
+        // Short enough to satisfy validatePowerCommandTimeout() for any timeout used below
+        lenient().when(config.keepAliveCheckInterval()).thenReturn(Duration.ofMillis(1));
     }
 
     @Test
-    void readTemperature1_returnsTemperatureFromModbusClient() {
+    void readMeasurements_returnsMeasurementsFromModbusClient() {
         when(modbusClient.readTemperature1()).thenReturn(Temperature.ofCelsius(45.2));
-
-        assertEquals(Temperature.ofCelsius(45.2), service.readTemperature1());
-    }
-
-    @Test
-    void readTargetTemperature_returnsTemperatureFromModbusClient() {
         when(modbusClient.readTargetTemperature()).thenReturn(Temperature.ofCelsius(60.0));
-
-        assertEquals(Temperature.ofCelsius(60.0), service.readTargetTemperature());
-    }
-
-    @Test
-    void readPower_returnsPowerFromModbusClient() {
         when(modbusClient.readPower()).thenReturn(Power.ofWatts(1500));
 
-        assertEquals(Power.ofWatts(1500), service.readPower());
+        Instant before = Instant.now();
+        Elwa2Measurements measurements = service.readMeasurements();
+        Instant after = Instant.now();
+
+        assertEquals(Temperature.ofCelsius(45.2), measurements.currentTemperature());
+        assertEquals(Temperature.ofCelsius(60.0), measurements.targetTemperature());
+        assertEquals(Power.ofWatts(1500), measurements.currentPower());
+        assertFalse(measurements.measuredAt().isBefore(before));
+        assertFalse(measurements.measuredAt().isAfter(after));
     }
 
     @Test
-    void readMaxPower_returnsPowerFromModbusClient() {
-        when(modbusClient.readMaxPower()).thenReturn(Power.ofWatts(3200));
+    void readMeasurements_updatesLastKnownMeasurements() {
+        when(modbusClient.readTemperature1()).thenReturn(Temperature.ofCelsius(45.2));
+        when(modbusClient.readTargetTemperature()).thenReturn(Temperature.ofCelsius(60.0));
+        when(modbusClient.readPower()).thenReturn(Power.ofWatts(1500));
 
-        assertEquals(Power.ofWatts(3200), service.readMaxPower());
+        Elwa2Measurements measurements = service.readMeasurements();
+
+        assertEquals(Optional.of(measurements), service.getLastKnownMeasurements());
     }
 
     @Test
-    void readPowerTimeout_returnsDurationFromModbusClient() {
-        when(modbusClient.readPowerTimeout()).thenReturn(Duration.ofSeconds(30));
+    void readMeasurements_propagatesException_whenModbusCommunicationFails() {
+        when(modbusClient.readTemperature1()).thenThrow(new RuntimeException("Modbus timeout"));
 
-        assertEquals(Duration.ofSeconds(30), service.readPowerTimeout());
+        assertThrows(RuntimeException.class, () -> service.readMeasurements());
+    }
+
+    @Test
+    void getLastKnownMeasurements_returnsEmpty_whenNoMeasurementsReadYet() {
+        assertEquals(Optional.empty(), service.getLastKnownMeasurements());
     }
 
     @Test
@@ -93,7 +105,8 @@ class Elwa2AdapterTest {
 
     @Test
     void keepHeatingAlive_doesNotRefresh_whenElapsedTimeBelowHalfTimeout() {
-        when(modbusClient.readPowerTimeout()).thenReturn(Duration.ofSeconds(60));
+        when(modbusClient.readPowerCommandTimeout()).thenReturn(Duration.ofSeconds(60));
+        service.initialize();
 
         service.adjustHeating(Power.ofWatts(1000));
         service.keepHeatingAlive();
@@ -103,7 +116,8 @@ class Elwa2AdapterTest {
 
     @Test
     void keepHeatingAlive_refreshes_whenElapsedTimeReachesHalfTimeout() throws InterruptedException {
-        when(modbusClient.readPowerTimeout()).thenReturn(Duration.ofMillis(4));
+        when(modbusClient.readPowerCommandTimeout()).thenReturn(Duration.ofMillis(4));
+        service.initialize();
 
         service.adjustHeating(Power.ofWatts(1000));
         Thread.sleep(20);
@@ -113,11 +127,21 @@ class Elwa2AdapterTest {
     }
 
     @Test
-    void keepHeatingAlive_swallowsException_whenModbusCommunicationFails() {
-        when(modbusClient.readPowerTimeout()).thenThrow(new RuntimeException("Modbus timeout"));
+    void initialize_usesFallbackTimeout_whenReadingPowerCommandTimeoutFails() throws InterruptedException {
+        // readPowerCommandTimeout() is now only read once during initialize(); a failure
+        // there falls back to the configured default instead of failing startup
+        when(modbusClient.readPowerCommandTimeout())
+                .thenThrow(new ModbusClientException("Modbus timeout", "localhost", 502));
+        when(config.powerCommandTimeoutFallback()).thenReturn(Duration.ofMillis(4));
 
+        assertDoesNotThrow(() -> service.initialize());
+
+        // The fallback value must actually be used by keepHeatingAlive(), not just avoid
+        // throwing during initialize()
         service.adjustHeating(Power.ofWatts(1000));
+        Thread.sleep(20);
+        service.keepHeatingAlive();
 
-        assertDoesNotThrow(() -> service.keepHeatingAlive());
+        verify(modbusClient, times(2)).setPower(Power.ofWatts(1000));
     }
 }

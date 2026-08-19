@@ -1,9 +1,8 @@
 package de.bimalo.homeauto.boundary.elwa2;
 
+import de.bimalo.homeauto.boundary.modbus.ModbusClientException;
 import de.bimalo.homeauto.entity.Power;
-import de.bimalo.homeauto.entity.Temperature;
 import io.quarkus.scheduler.Scheduled;
-import io.smallrye.faulttolerance.api.CircuitBreakerName;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -11,13 +10,14 @@ import jakarta.inject.Inject;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.Optional;
+
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
-import org.eclipse.microprofile.faulttolerance.Fallback;
 import org.eclipse.microprofile.faulttolerance.Timeout;
 
 /**
- * Service class for the ELWA2 heating rod.
+ * Adapter for the ELWA2 heating rod.
  * Provides access to key performance data of the heating rod.
  * Implements Circuit Breaker pattern to handle Modbus communication failures.
  */
@@ -25,17 +25,12 @@ import org.eclipse.microprofile.faulttolerance.Timeout;
 @ApplicationScoped
 public class Elwa2Adapter {
 
-    private static final Duration DEFAULT_POWER_TIMEOUT = Duration.ofMinutes(1);
-
     private final Elwa2ModbusClient modbusClient;
-    private final Elwa2Config config;
+    private Elwa2Config config;
 
-    // Cached values for fallback when circuit is open
-    private volatile Temperature lastKnownTemperature1 = Temperature.ofCelsius(20.0);
-    private volatile Temperature lastKnownTargetTemperature = Temperature.ofCelsius(60.0);
-    private volatile Power lastKnownPower = Power.ofWatts(0);
-    private volatile Power lastKnownMaxPower = Power.ofWatts(Elwa2ModbusClient.MAX_POWER_WATTS);
-    private volatile Elwa2Status lastKnownStatus = Elwa2Status.UNKNOWN;
+    private volatile Elwa2Measurements lastKnownMeasurements;
+
+    private volatile Duration powerCommandTimeout;
 
     // Tracks the currently requested heating power and when it was last written,
     // used to keep the request alive within the ELWA2's own power timeout.
@@ -45,6 +40,7 @@ public class Elwa2Adapter {
     @Inject
     public Elwa2Adapter(Elwa2Config config) {
         this(config, new Elwa2ModbusClient(config.modbus().host(), config.modbus().port()));
+        this.config = config;
     }
 
     Elwa2Adapter(Elwa2Config config, Elwa2ModbusClient modbusClient) {
@@ -55,6 +51,7 @@ public class Elwa2Adapter {
     @PostConstruct
     public void initialize() {
         modbusClient.initialize();
+        powerCommandTimeout = determinePowerCommandTimeout();
     }
 
     @PreDestroy
@@ -62,139 +59,68 @@ public class Elwa2Adapter {
         modbusClient.shutdown();
     }
 
-    @CircuitBreaker(
-            requestVolumeThreshold = 4,
-            failureRatio = 0.5,
-            delay = 5000,
-            successThreshold = 2)
-    @Timeout(value = 3000)
-    @Fallback(fallbackMethod = "readTemperature1Fallback")
-    @CircuitBreakerName("elwa2-temperature1")
-    public Temperature readTemperature1() {
-        Temperature result = modbusClient.readTemperature1();
-        lastKnownTemperature1 = result; // Cache successful read
-        return result;
+    @CircuitBreaker(requestVolumeThreshold = 4, failureRatio = 0.5, delay = 5000, successThreshold = 2)
+    @Timeout(6000)
+    public Elwa2Measurements readMeasurements() {
+        Elwa2Measurements measurements = new Elwa2Measurements(
+                modbusClient.readTemperature1(),
+                modbusClient.readTargetTemperature(),
+                modbusClient.readPower(),
+                modbusClient.readStatus(),
+                Instant.now());
+
+        lastKnownMeasurements = measurements;
+        return measurements;
     }
 
-    private Temperature readTemperature1Fallback() {
-        log.warn("Circuit breaker open for temperature1 read, returning last known value: {}°C",
-                lastKnownTemperature1.getCelsius());
-        return lastKnownTemperature1;
+    public Optional<Elwa2Measurements> getLastKnownMeasurements() {
+        return Optional.ofNullable(lastKnownMeasurements);
     }
 
-    @CircuitBreaker(
-            requestVolumeThreshold = 4,
-            failureRatio = 0.5,
-            delay = 5000,
-            successThreshold = 2)
-    @Timeout(value = 3000)
-    @Fallback(fallbackMethod = "readTargetTemperatureFallback")
-    @CircuitBreakerName("elwa2-target-temperature")
-    public Temperature readTargetTemperature() {
-        Temperature result = modbusClient.readTargetTemperature();
-        lastKnownTargetTemperature = result; // Cache successful read
-        return result;
-    }
+    public synchronized void stopHeating() {
+        Power previousPower = lastRequestedPower;
 
-    private Temperature readTargetTemperatureFallback() {
-        log.warn("Circuit breaker open for target temperature read, returning last known value: {}°C",
-                lastKnownTargetTemperature.getCelsius());
-        return lastKnownTargetTemperature;
-    }
+        // before modus write deactivate keep-alive
+        lastRequestedPower = Power.ZERO;
 
-    @CircuitBreaker(
-            requestVolumeThreshold = 4,
-            failureRatio = 0.5,
-            delay = 5000,
-            successThreshold = 2)
-    @Timeout(value = 3000)
-    @Fallback(fallbackMethod = "readDeviceStatusFallback")
-    @CircuitBreakerName("elwa2-status")
-    public Elwa2Status readDeviceStatus() {
-        Elwa2Status result = modbusClient.readStatus();
-        lastKnownStatus = result; // Cache successful read
-        return result;
-    }
+        try {
+            modbusClient.setPower(Power.ZERO);
+            lastPowerRequestAt = Instant.now();
 
-    private Elwa2Status readDeviceStatusFallback() {
-        log.warn("Circuit breaker open for device status read, returning last known value: {}", lastKnownStatus);
-        return lastKnownStatus;
-    }
-
-    @CircuitBreaker(
-            requestVolumeThreshold = 4,
-            failureRatio = 0.5,
-            delay = 5000,
-            successThreshold = 2)
-    @Timeout(value = 3000)
-    @Fallback(fallbackMethod = "readPowerFallback")
-    @CircuitBreakerName("elwa2-power")
-    public Power readPower() {
-        Power result = modbusClient.readPower();
-        lastKnownPower = result; // Cache successful read
-        return result;
-    }
-
-    private Power readPowerFallback() {
-        log.warn("Circuit breaker open for power read, returning last known value: {} W",
-                lastKnownPower.getWatts());
-        return lastKnownPower;
-    }
-
-    @CircuitBreaker(
-            requestVolumeThreshold = 4,
-            failureRatio = 0.5,
-            delay = 5000,
-            successThreshold = 2)
-    @Timeout(value = 3000)
-    @Fallback(fallbackMethod = "readMaxPowerFallback")
-    @CircuitBreakerName("elwa2-max-power")
-    public Power readMaxPower() {
-        Power result = modbusClient.readMaxPower();
-        lastKnownMaxPower = result; // Cache successful read
-        return result;
-    }
-
-    private Power readMaxPowerFallback() {
-        log.warn("Circuit breaker open for max power read, returning last known value: {} W",
-                lastKnownMaxPower.getWatts());
-        return lastKnownMaxPower;
-    }
-
-    @CircuitBreaker(
-            requestVolumeThreshold = 4,
-            failureRatio = 0.5,
-            delay = 5000,
-            successThreshold = 2)
-    @Timeout(value = 3000)
-    @Fallback(fallbackMethod = "readPowerTimeoutFallback")
-    @CircuitBreakerName("elwa2-power-timeout")
-    public Duration readPowerTimeout() {
-        return modbusClient.readPowerTimeout();
-    }
-
-    private Duration readPowerTimeoutFallback(Exception e) {
-        log.error("Failed to read power timeout, returning default value of {}", DEFAULT_POWER_TIMEOUT, e);
-        return DEFAULT_POWER_TIMEOUT;
+            if (previousPower.isPositive()) {
+                log.info("Heating stopped; previous request was {}", previousPower);
+            }
+        } catch (RuntimeException ex) {
+            log.error("Failed to send stop command to ELWA2; keep-alive remains disabled", ex);
+            throw ex;
+        }
     }
 
     /**
      * Sets the heating power of the ELWA2 heating rod.
      *
      * @param power the desired heating power
-     * @throws NullPointerException if power is null
+     * @throws NullPointerException     if power is null
      * @throws IllegalArgumentException if the power is negative or exceeds the
      *                                  maximum power
      */
-    public void adjustHeating(Power power) {
+    public synchronized void adjustHeating(Power power) {
         Objects.requireNonNull(power, "Power must not be null");
-        boolean changed = !power.equals(lastRequestedPower);
-        modbusClient.setPower(power);
-        if (changed) {
-            log.info("Heating power changed from {} to {}", lastRequestedPower, power);
+
+        if (!power.isPositive()) {
+            stopHeating();
+            return;
         }
+
+        Power previousPower = lastRequestedPower;
+
+        modbusClient.setPower(power);
         lastRequestedPower = power;
         lastPowerRequestAt = Instant.now();
+
+        if (!power.equals(previousPower)) {
+            log.info("Heating power changed from {} to {}", previousPower, power);
+        }
     }
 
     /**
@@ -204,19 +130,50 @@ public class Elwa2Adapter {
      * need to call {@link #adjustHeating(Power)} once. Does nothing while no
      * heating power is requested.
      */
-    @Scheduled(every = "{elwa2.keep-alive-check-interval}")
-    public void keepHeatingAlive() {
+    @Scheduled(every = "{elwa2.keep-alive-check-interval}", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
+    public synchronized void keepHeatingAlive() {
         if (!lastRequestedPower.isPositive()) {
             return;
         }
         try {
-            Duration timeout = readPowerTimeout();
             Duration elapsed = Duration.between(lastPowerRequestAt, Instant.now());
-            if (elapsed.compareTo(timeout.dividedBy(2)) >= 0) {
+            if (elapsed.compareTo(powerCommandTimeout.dividedBy(2)) >= 0) {
                 adjustHeating(lastRequestedPower);
             }
         } catch (Exception e) {
             log.error("Failed to refresh heating power request for ELWA2", e);
+        }
+    }
+
+    private Duration determinePowerCommandTimeout() {
+        try {
+            Duration timeout = modbusClient.readPowerCommandTimeout();
+            validatePowerCommandTimeout(timeout);
+
+            log.info("ELWA2 power command timeout is {}", timeout);
+            return timeout;
+        } catch (ModbusClientException e) {
+            Duration fallback = config.powerCommandTimeoutFallback();
+
+            log.warn(
+                    "Could not read ELWA2 power command timeout; using configured fallback {}",
+                    fallback,
+                    e);
+
+            return fallback;
+        }
+    }
+
+    private void validatePowerCommandTimeout(Duration timeout) {
+        if (timeout == null || timeout.isZero() || timeout.isNegative()) {
+            throw new IllegalArgumentException(
+                    "ELWA2 power command timeout must be positive");
+        }
+
+        if (config.keepAliveCheckInterval().compareTo(timeout.dividedBy(2)) >= 0) {
+            throw new IllegalStateException(
+                    "ELWA2 keep-alive interval must be shorter than half "
+                            + "the power command timeout");
         }
     }
 }

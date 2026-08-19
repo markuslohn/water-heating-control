@@ -2,6 +2,7 @@ package de.bimalo.homeauto.control.manualwaterheating;
 
 import de.bimalo.homeauto.boundary.e3dc.E3dcAdapter;
 import de.bimalo.homeauto.boundary.elwa2.Elwa2Adapter;
+import de.bimalo.homeauto.boundary.elwa2.Elwa2Measurements;
 import de.bimalo.homeauto.boundary.viessman.VitodensAdapter;
 import de.bimalo.homeauto.control.heatingcontrol.HeatingControlConfig;
 import de.bimalo.homeauto.control.heatingcontrol.HeatingControlService;
@@ -120,8 +121,9 @@ public class ManualWaterHeatingService {
     }
 
     private void runCycle() {
-        Temperature rodCurrentTemp = elwa2Adapter.readTemperature1();
-        Temperature rodTargetTemp = elwa2Adapter.readTargetTemperature();
+        Elwa2Measurements measurements = elwa2Adapter.readMeasurements();
+        Temperature rodCurrentTemp = measurements.currentTemperature();
+        Temperature rodTargetTemp = measurements.targetTemperature();
 
         HeatingDecision decision = determineElectricHeatingPower(rodCurrentTemp, rodTargetTemp);
         elwa2Adapter.adjustHeating(decision.power());
@@ -232,8 +234,10 @@ public class ManualWaterHeatingService {
     }
 
     /**
-     * @return true if gas heating was actively running this session and just reached its
-     *         target - i.e. the gas heating goal was actually accomplished, as opposed to
+     * @return true if gas heating was actively running this session and just
+     *         reached its
+     *         target - i.e. the gas heating goal was actually accomplished, as
+     *         opposed to
      *         gas simply never having been needed
      */
     private boolean manageGasFallback() {

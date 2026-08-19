@@ -1,6 +1,7 @@
 package de.bimalo.homeauto.boundary.rest;
 
 import de.bimalo.homeauto.boundary.elwa2.Elwa2Adapter;
+import de.bimalo.homeauto.boundary.elwa2.Elwa2Measurements;
 import de.bimalo.homeauto.control.heatingcontrol.HeatingControlService;
 import de.bimalo.homeauto.entity.Season;
 import de.bimalo.homeauto.entity.HeatingStatus;
@@ -30,16 +31,24 @@ public class HeatingControlResource {
     /**
      * Gets the current heating rod status.
      *
-     * @return current heating status including active state, power, temperatures and manual mode
+     * @return current heating status including active state, power, temperatures
+     *         and manual mode
      */
     @GET
     @Path("/status")
     public HeatingStatus getStatus() {
         log.debug("REST: Getting heating status");
 
-        Power power = elwa2Adapter.readPower();
-        Temperature currentTemp = elwa2Adapter.readTemperature1();
-        Temperature targetTemp = elwa2Adapter.readTargetTemperature();
+        Elwa2Measurements measurements;
+        try {
+            measurements = elwa2Adapter.readMeasurements();
+        } catch (RuntimeException ex) {
+            measurements = elwa2Adapter.getLastKnownMeasurements().orElseThrow();
+        }
+
+        Power power = measurements.currentPower();
+        Temperature currentTemp = measurements.currentTemperature();
+        Temperature targetTemp = measurements.targetTemperature();
         Season currentSeason = heatingControlService.getCurrentSeason();
 
         return HeatingStatus.builder()
