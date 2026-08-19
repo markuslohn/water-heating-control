@@ -1,6 +1,5 @@
-package de.bimalo.homeauto.control.battery;
+package de.bimalo.homeauto.boundary.e3dc;
 
-import de.bimalo.homeauto.boundary.e3dc.E3dcModbusClient;
 import de.bimalo.homeauto.entity.BatteryStatus;
 import de.bimalo.homeauto.entity.Percentage;
 import de.bimalo.homeauto.entity.Power;
@@ -21,10 +20,10 @@ import org.eclipse.microprofile.faulttolerance.Timeout;
  */
 @Slf4j
 @ApplicationScoped
-public class BatteryStorageService {
+public class E3dcAdapter {
 
     private final E3dcModbusClient modbusClient;
-    private final BatteryStorageConfig config;
+    private final E3dcConfig config;
 
     // Cached values for fallback when circuit is open
     private volatile Power lastKnownGridPower = Power.ofWatts(0);
@@ -34,7 +33,7 @@ public class BatteryStorageService {
     private volatile Percentage lastKnownBatteryStateOfCharge = Percentage.of(50);
 
     @Inject
-    public BatteryStorageService(BatteryStorageConfig config) {
+    public E3dcAdapter(E3dcConfig config) {
         this.config = config;
         this.modbusClient = new E3dcModbusClient(config.modbus().host(), config.modbus().port());
     }

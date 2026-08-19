@@ -1,8 +1,5 @@
-package de.bimalo.homeauto.control.gasheating;
+package de.bimalo.homeauto.boundary.viessman;
 
-import de.bimalo.homeauto.boundary.viessman.ExternalRequestMode;
-import de.bimalo.homeauto.boundary.viessman.HotWaterProgram;
-import de.bimalo.homeauto.boundary.viessman.VitodensModbusClient;
 import de.bimalo.homeauto.entity.Temperature;
 import de.bimalo.homeauto.entity.Volume;
 import io.quarkus.scheduler.Scheduled;
@@ -19,9 +16,9 @@ import org.eclipse.microprofile.faulttolerance.Timeout;
 
 @Slf4j
 @ApplicationScoped
-public class GasHeatingService {
+public class VitodensAdapter {
 
-    private final GasHeatingConfig config;
+    private final VitodensConfig config;
     private final VitodensModbusClient modbusClient;
 
     // Cached values for fallback when circuit is open
@@ -36,11 +33,11 @@ public class GasHeatingService {
     private final AtomicBoolean active = new AtomicBoolean(false);
 
     @Inject
-    public GasHeatingService(GasHeatingConfig config) {
+    public VitodensAdapter(VitodensConfig config) {
         this(config, new VitodensModbusClient(config.modbus().host(), config.modbus().port()));
     }
 
-    GasHeatingService(GasHeatingConfig config, VitodensModbusClient modbusClient) {
+    VitodensAdapter(VitodensConfig config, VitodensModbusClient modbusClient) {
         this.config = config;
         this.modbusClient = modbusClient;
     }
@@ -149,7 +146,7 @@ public class GasHeatingService {
      * independently of any control loop so callers only need to call
      * {@link #activateHeating()}/{@link #deactivateHeating()} once.
      */
-    @Scheduled(every = "{gasheating.keep-alive-interval}")
+    @Scheduled(every = "{vitodens.keep-alive-interval}")
     public void keepExternalRequestAlive() {
         System.out.println("keep " + active.get());
         if (!active.get()) {

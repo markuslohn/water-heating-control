@@ -1,6 +1,6 @@
 package de.bimalo.homeauto.boundary.rest;
 
-import de.bimalo.homeauto.control.battery.BatteryStorageService;
+import de.bimalo.homeauto.boundary.e3dc.E3dcAdapter;
 import de.bimalo.homeauto.control.heatingcontrol.HeatingControlService;
 import de.bimalo.homeauto.entity.BatteryStatus;
 import jakarta.inject.Inject;
@@ -22,7 +22,7 @@ import lombok.extern.slf4j.Slf4j;
 public class BatteryStatusResource {
 
     @Inject
-    BatteryStorageService batteryStorageService;
+    E3dcAdapter e3dcAdapter;
 
     @Inject
     HeatingControlService heatingControlService;
@@ -36,7 +36,7 @@ public class BatteryStatusResource {
     @Path("/status")
     public BatteryStatus getStatus() {
         log.debug("REST: Getting battery status");
-        return batteryStorageService.getCurrentStatus();
+        return e3dcAdapter.getCurrentStatus();
     }
 
     /**

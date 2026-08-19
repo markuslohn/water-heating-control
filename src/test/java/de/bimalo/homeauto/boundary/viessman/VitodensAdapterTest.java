@@ -1,4 +1,4 @@
-package de.bimalo.homeauto.control.gasheating;
+package de.bimalo.homeauto.boundary.viessman;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -9,9 +9,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.bimalo.homeauto.boundary.viessman.ExternalRequestMode;
-import de.bimalo.homeauto.boundary.viessman.HotWaterProgram;
-import de.bimalo.homeauto.boundary.viessman.VitodensModbusClient;
 import de.bimalo.homeauto.entity.Temperature;
 import de.bimalo.homeauto.entity.Volume;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,23 +18,23 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Test class for GasHeatingService.
+ * Test class for VitodensAdapter.
  * Mocks Modbus device communication to test the control logic in isolation.
  */
 @ExtendWith(MockitoExtension.class)
-class GasHeatingServiceTest {
+class VitodensAdapterTest {
 
     @Mock
-    private GasHeatingConfig config;
+    private VitodensConfig config;
 
     @Mock
     private VitodensModbusClient modbusClient;
 
-    private GasHeatingService service;
+    private VitodensAdapter service;
 
     @BeforeEach
     void setUp() {
-        service = new GasHeatingService(config, modbusClient);
+        service = new VitodensAdapter(config, modbusClient);
     }
 
     @Test

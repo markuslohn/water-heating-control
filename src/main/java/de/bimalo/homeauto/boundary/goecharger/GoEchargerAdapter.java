@@ -1,7 +1,5 @@
-package de.bimalo.homeauto.control.wallbox;
+package de.bimalo.homeauto.boundary.goecharger;
 
-import de.bimalo.homeauto.boundary.goecharger.CarStatus;
-import de.bimalo.homeauto.boundary.goecharger.GoEchargerModbusClient;
 import de.bimalo.homeauto.entity.Power;
 import io.smallrye.faulttolerance.api.CircuitBreakerName;
 import jakarta.annotation.PostConstruct;
@@ -20,17 +18,17 @@ import org.eclipse.microprofile.faulttolerance.Timeout;
  */
 @Slf4j
 @ApplicationScoped
-public class WallboxService {
+public class GoEchargerAdapter {
 
     private final GoEchargerModbusClient modbusClient;
-    private final WallboxConfig config;
+    private final GoEchargerConfig config;
 
     // Cached values for fallback when circuit is open
     private volatile CarStatus lastKnownCarStatus = CarStatus.UNKNOWN;
     private volatile Power lastKnownChargingPower = Power.ofWatts(0);
 
     @Inject
-    public WallboxService(WallboxConfig config) {
+    public GoEchargerAdapter(GoEchargerConfig config) {
         this.config = config;
         this.modbusClient = new GoEchargerModbusClient(config.modbus().host(), config.modbus().port());
     }

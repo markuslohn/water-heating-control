@@ -1,4 +1,4 @@
-package de.bimalo.homeauto.control.heatingrod;
+package de.bimalo.homeauto.boundary.elwa2;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -8,7 +8,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.bimalo.homeauto.boundary.elwa2.Elwa2ModbusClient;
 import de.bimalo.homeauto.entity.Power;
 import de.bimalo.homeauto.entity.Temperature;
 import java.time.Duration;
@@ -19,23 +18,23 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Test class for HeatingRodService.
+ * Test class for Elwa2Adapter.
  * Mocks Modbus device communication to test the control logic in isolation.
  */
 @ExtendWith(MockitoExtension.class)
-class HeatingRodServiceTest {
+class Elwa2AdapterTest {
 
     @Mock
-    private HeatingRodConfig config;
+    private Elwa2Config config;
 
     @Mock
     private Elwa2ModbusClient modbusClient;
 
-    private HeatingRodService service;
+    private Elwa2Adapter service;
 
     @BeforeEach
     void setUp() {
-        service = new HeatingRodService(config, modbusClient);
+        service = new Elwa2Adapter(config, modbusClient);
     }
 
     @Test

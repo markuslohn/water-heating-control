@@ -1,4 +1,4 @@
-package de.bimalo.homeauto.control.wallbox;
+package de.bimalo.homeauto.boundary.e3dc;
 
 import io.smallrye.config.ConfigMapping;
 import io.smallrye.config.WithDefault;
@@ -7,22 +7,28 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 
 /**
- * Configuration for go-eCharger wallbox.
+ * Konfiguration für den E3/DC Batteriespeicher.
  */
-@ConfigMapping(prefix = "wallbox")
-public interface WallboxConfig {
+@ConfigMapping(prefix = "e3dc")
+public interface E3dcConfig {
 
+    /**
+     * Modbus-spezifische Konfiguration.
+     */
     ModbusConfig modbus();
 
+    /**
+     * Modbus Konfiguration.
+     */
     interface ModbusConfig {
         /**
-         * IP or hostname of the go-eCharger wallbox.
+         * IP-Adresse oder Hostname des E3/DC Systems.
          */
         @NotBlank
         String host();
 
         /**
-         * TCP-Port des go-eCharger wallbox.
+         * TCP-Port des E3/DC Systems.
          */
         @Min(1)
         @Max(65535)

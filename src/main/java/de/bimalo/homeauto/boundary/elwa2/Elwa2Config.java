@@ -1,4 +1,4 @@
-package de.bimalo.homeauto.control.heatingrod;
+package de.bimalo.homeauto.boundary.elwa2;
 
 import io.smallrye.config.ConfigMapping;
 import io.smallrye.config.WithDefault;
@@ -9,8 +9,8 @@ import jakarta.validation.constraints.NotBlank;
 /**
  * Configuration for the heating rod system.
  */
-@ConfigMapping(prefix = "heatingrod")
-public interface HeatingRodConfig {
+@ConfigMapping(prefix = "elwa2")
+public interface Elwa2Config {
 
     /**
      * Modbus-spezifische Konfiguration.
@@ -21,7 +21,7 @@ public interface HeatingRodConfig {
      * Interval at which it is checked whether the heating power request needs to
      * be refreshed. The ELWA2 reverts to standby on its own if the power request
      * isn't refreshed within its own power timeout (see
-     * {@link de.bimalo.homeauto.boundary.elwa2.Elwa2ModbusClient#readPowerTimeout()}).
+     * {@link Elwa2ModbusClient#readPowerTimeout()}).
      * Supports duration expressions like "10s", "1m".
      */
     @WithDefault("10s")

@@ -10,9 +10,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.bimalo.homeauto.boundary.e3dc.E3dcAdapter;
+import de.bimalo.homeauto.boundary.elwa2.Elwa2Adapter;
 import de.bimalo.homeauto.boundary.modbus.ModbusReadException;
-import de.bimalo.homeauto.control.battery.BatteryStorageService;
-import de.bimalo.homeauto.control.heatingrod.HeatingRodService;
 import de.bimalo.homeauto.entity.BatteryStatus;
 import de.bimalo.homeauto.entity.Percentage;
 import de.bimalo.homeauto.entity.Power;
@@ -38,10 +38,10 @@ class HeatingControlServiceTest {
     private HeatingControlConfig config;
 
     @Mock
-    private BatteryStorageService batteryStorageService;
+    private E3dcAdapter e3dcAdapter;
 
     @Mock
-    private HeatingRodService heatingRodService;
+    private Elwa2Adapter elwa2Adapter;
 
     @InjectMocks
     private HeatingControlService heatingControlService;
@@ -69,8 +69,8 @@ class HeatingControlServiceTest {
         heatingControlService.controlHeatingSummer();
 
         // Then
-        verify(heatingRodService, never()).readTemperature1();
-        verify(heatingRodService, never()).adjustHeating(any());
+        verify(elwa2Adapter, never()).readTemperature1();
+        verify(elwa2Adapter, never()).adjustHeating(any());
     }
 
     @Test
@@ -80,15 +80,15 @@ class HeatingControlServiceTest {
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         Power currentHeatingPower = Power.ofWatts(500);
 
-        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
+        when(elwa2Adapter.readTemperature1()).thenReturn(currentTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(currentHeatingPower);
 
         // When
         heatingControlService.controlHeatingSummer();
 
         // Then
-        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 0));
+        verify(elwa2Adapter).adjustHeating(argThat(power -> power.getWatts() == 0));
     }
 
     @Test
@@ -98,15 +98,15 @@ class HeatingControlServiceTest {
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         Power currentHeatingPower = Power.ofWatts(0); // Already stopped
 
-        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
+        when(elwa2Adapter.readTemperature1()).thenReturn(currentTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(currentHeatingPower);
 
         // When
         heatingControlService.controlHeatingSummer();
 
         // Then
-        verify(heatingRodService, never()).adjustHeating(any());
+        verify(elwa2Adapter, never()).adjustHeating(any());
     }
 
     @Test
@@ -122,11 +122,11 @@ class HeatingControlServiceTest {
         // minimum)
         BatteryStatus batteryStatus = createBatteryStatus(70, 250, 200, 0);
 
-        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
-        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(elwa2Adapter.readTemperature1()).thenReturn(currentTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(currentHeatingPower);
+        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
 
         // When
         heatingControlService.controlHeatingSummer();
@@ -134,7 +134,7 @@ class HeatingControlServiceTest {
         // Then
         // adjustedSurplus = 250 - (200 - 200) = 250W, above minimum of 100W
         // heating priority: availableForHeating = 250 + 0 = 250W
-        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 250));
+        verify(elwa2Adapter).adjustHeating(argThat(power -> power.getWatts() == 250));
     }
 
     @Test
@@ -150,18 +150,18 @@ class HeatingControlServiceTest {
         // heating priority: availableForHeating = 0 + 0 = 0W < 100W → stop
         BatteryStatus batteryStatus = createBatteryStatus(70, 100, 300, 0);
 
-        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
-        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(elwa2Adapter.readTemperature1()).thenReturn(currentTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(currentHeatingPower);
+        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
 
         // When
         heatingControlService.controlHeatingSummer();
 
         // Then
         // adjustedSurplus capped to 0, below minimum of 100W
-        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 0));
+        verify(elwa2Adapter).adjustHeating(argThat(power -> power.getWatts() == 0));
     }
 
     @Test
@@ -177,18 +177,18 @@ class HeatingControlServiceTest {
         // But we want 1700W, so: production=1700, consumption=200 → 1700 - 0 = 1700W
         BatteryStatus batteryStatus = createBatteryStatus(70, 1900, 200, 0);
 
-        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
-        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(elwa2Adapter.readTemperature1()).thenReturn(currentTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(currentHeatingPower);
+        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
 
         // When
         heatingControlService.controlHeatingSummer();
 
         // Then
         // adjustedSurplus = 1900 - (200 - 200) = 1900W
-        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 1900));
+        verify(elwa2Adapter).adjustHeating(argThat(power -> power.getWatts() == 1900));
     }
 
     @Test
@@ -202,18 +202,18 @@ class HeatingControlServiceTest {
         // heating priority: availableForHeating = 3700 + 0 = 3700W, limited to 2900W
         BatteryStatus batteryStatus = createBatteryStatus(70, 3700, 200, 0);
 
-        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
-        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(elwa2Adapter.readTemperature1()).thenReturn(currentTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(currentHeatingPower);
+        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
 
         // When
         heatingControlService.controlHeatingSummer();
 
         // Then
         // adjustedSurplus = 3700W, limited to max 2900W
-        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 2900));
+        verify(elwa2Adapter).adjustHeating(argThat(power -> power.getWatts() == 2900));
     }
 
     @Test
@@ -226,18 +226,18 @@ class HeatingControlServiceTest {
         // New logic: production=2900, consumption=200 → 2900 - (200-200) = 2900W
         BatteryStatus batteryStatus = createBatteryStatus(70, 2900, 200, 0);
 
-        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
-        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(elwa2Adapter.readTemperature1()).thenReturn(currentTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(currentHeatingPower);
+        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
 
         // When
         heatingControlService.controlHeatingSummer();
 
         // Then
         // adjustedSurplus = 2900, exactly at maximum
-        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 2900));
+        verify(elwa2Adapter).adjustHeating(argThat(power -> power.getWatts() == 2900));
     }
 
     @Test
@@ -250,24 +250,24 @@ class HeatingControlServiceTest {
         // New logic: production=1200, consumption=0 → 1200 - 0 = 1200W
         BatteryStatus batteryStatus = createBatteryStatus(70, 1200, 0, 0);
 
-        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
-        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(elwa2Adapter.readTemperature1()).thenReturn(currentTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(currentHeatingPower);
+        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
 
         // When
         heatingControlService.controlHeatingSummer();
 
         // Then
         // adjustedSurplus = 1200W
-        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 1200));
+        verify(elwa2Adapter).adjustHeating(argThat(power -> power.getWatts() == 1200));
     }
 
     @Test
     void testControlHeating_WhenExceptionOccurs_ShouldHandleGracefully() {
         // Given
-        when(heatingRodService.readTemperature1())
+        when(elwa2Adapter.readTemperature1())
                 .thenThrow(new ModbusReadException("Modbus communication error", "localhost", 502, 10001, null));
 
         // When
@@ -275,7 +275,7 @@ class HeatingControlServiceTest {
 
         // Then
         // Should not throw exception, just log it
-        verify(heatingRodService, never()).adjustHeating(any());
+        verify(elwa2Adapter, never()).adjustHeating(any());
     }
 
     @Test
@@ -288,18 +288,18 @@ class HeatingControlServiceTest {
         // New logic: production=100, consumption=50 → 100 - (50-50) = 100W
         BatteryStatus batteryStatus = createBatteryStatus(70, 100, 50, 0);
 
-        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
-        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(elwa2Adapter.readTemperature1()).thenReturn(currentTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(currentHeatingPower);
+        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
 
         // When
         heatingControlService.controlHeatingSummer();
 
         // Then
         // adjustedSurplus = 100W, exactly at minimum
-        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 100));
+        verify(elwa2Adapter).adjustHeating(argThat(power -> power.getWatts() == 100));
     }
 
     @Test
@@ -312,18 +312,18 @@ class HeatingControlServiceTest {
         // New logic: production=99, consumption=50 → 99 - (50-50) = 99W
         BatteryStatus batteryStatus = createBatteryStatus(70, 99, 50, 0);
 
-        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
-        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(elwa2Adapter.readTemperature1()).thenReturn(currentTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(currentHeatingPower);
+        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
 
         // When
         heatingControlService.controlHeatingSummer();
 
         // Then
         // adjustedSurplus = 99W, just below minimum of 100W
-        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 0));
+        verify(elwa2Adapter).adjustHeating(argThat(power -> power.getWatts() == 0));
     }
 
     @Test
@@ -343,11 +343,11 @@ class HeatingControlServiceTest {
                 .batteryStateOfCharge(Percentage.of(70))
                 .build();
 
-        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
-        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(elwa2Adapter.readTemperature1()).thenReturn(currentTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(currentHeatingPower);
+        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
 
         // When
         heatingControlService.controlHeatingSummer();
@@ -356,7 +356,7 @@ class HeatingControlServiceTest {
         // adjustedSurplus = 0 + 1000 = 1000W
         // Battery discharging: 1000 - 1644 = -644W (capped to 0)
         // 0W < minimum 100W, so heating should stop
-        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 0));
+        verify(elwa2Adapter).adjustHeating(argThat(power -> power.getWatts() == 0));
     }
 
     // ==================== Battery Priority Tests ====================
@@ -372,11 +372,11 @@ class HeatingControlServiceTest {
         // Battery priority: 2000 - 1000 (reserved) = 1000W
         BatteryStatus batteryStatus = createBatteryStatus(50, 2000, 0, 0);
 
-        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
-        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(elwa2Adapter.readTemperature1()).thenReturn(currentTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(currentHeatingPower);
+        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
         when(config.batteryPriorityEnabled()).thenReturn(true);
         when(config.batteryPriorityThreshold()).thenReturn(60);
         when(config.batteryReservedPower()).thenReturn(1000);
@@ -386,7 +386,7 @@ class HeatingControlServiceTest {
 
         // Then
         // adjustedSurplus = 2000W, battery priority: 2000 - 1000 = 1000W
-        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 1000));
+        verify(elwa2Adapter).adjustHeating(argThat(power -> power.getWatts() == 1000));
     }
 
     @Test
@@ -399,11 +399,11 @@ class HeatingControlServiceTest {
         // New logic: production=2000, consumption=0 → 2000W
         BatteryStatus batteryStatus = createBatteryStatus(70, 2000, 0, 0);
 
-        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
-        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(elwa2Adapter.readTemperature1()).thenReturn(currentTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(currentHeatingPower);
+        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
         when(config.batteryPriorityEnabled()).thenReturn(true);
         when(config.batteryPriorityThreshold()).thenReturn(60);
 
@@ -412,7 +412,7 @@ class HeatingControlServiceTest {
 
         // Then
         // SOC above threshold, heating priority: full 2000W available
-        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 2000));
+        verify(elwa2Adapter).adjustHeating(argThat(power -> power.getWatts() == 2000));
     }
 
     @Test
@@ -425,11 +425,11 @@ class HeatingControlServiceTest {
         // New logic: production=2000, consumption=0 → 2000W
         BatteryStatus batteryStatus = createBatteryStatus(50, 2000, 0, 0);
 
-        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
-        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(elwa2Adapter.readTemperature1()).thenReturn(currentTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(currentHeatingPower);
+        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
         when(config.batteryPriorityEnabled()).thenReturn(false); // Disabled in config
 
         // When
@@ -437,7 +437,7 @@ class HeatingControlServiceTest {
 
         // Then
         // Battery priority disabled: full 2000W available despite low SOC
-        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 2000));
+        verify(elwa2Adapter).adjustHeating(argThat(power -> power.getWatts() == 2000));
     }
 
     @Test
@@ -451,11 +451,11 @@ class HeatingControlServiceTest {
         // Battery priority: 800 - 1000 = -200W → 0W
         BatteryStatus batteryStatus = createBatteryStatus(50, 800, 0, 0);
 
-        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
-        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(elwa2Adapter.readTemperature1()).thenReturn(currentTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(currentHeatingPower);
+        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
         when(config.batteryPriorityEnabled()).thenReturn(true);
         when(config.batteryPriorityThreshold()).thenReturn(60);
         when(config.batteryReservedPower()).thenReturn(1000);
@@ -465,7 +465,7 @@ class HeatingControlServiceTest {
 
         // Then
         // adjustedSurplus = 800W, battery priority: 800 - 1000 = -200W → 0W < 100W
-        verify(heatingRodService, never()).adjustHeating(any());
+        verify(elwa2Adapter, never()).adjustHeating(any());
     }
 
     @Test
@@ -479,11 +479,11 @@ class HeatingControlServiceTest {
         // Battery priority: 2000 - 1000 = 1000W
         BatteryStatus batteryStatus = createBatteryStatus(45, 2000, 500, 0);
 
-        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
-        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(elwa2Adapter.readTemperature1()).thenReturn(currentTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(currentHeatingPower);
+        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
         when(config.batteryPriorityEnabled()).thenReturn(true);
         when(config.batteryPriorityThreshold()).thenReturn(60);
         when(config.batteryReservedPower()).thenReturn(1000);
@@ -493,7 +493,7 @@ class HeatingControlServiceTest {
 
         // Then
         // adjustedSurplus = 2000W, battery priority: 2000 - 1000 = 1000W
-        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 1000));
+        verify(elwa2Adapter).adjustHeating(argThat(power -> power.getWatts() == 1000));
     }
 
     @Test
@@ -506,11 +506,11 @@ class HeatingControlServiceTest {
         // New logic: production=2000, consumption=0 → 2000W
         BatteryStatus batteryStatus = createBatteryStatus(60, 2000, 0, 0);
 
-        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
-        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(elwa2Adapter.readTemperature1()).thenReturn(currentTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(currentHeatingPower);
+        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
         when(config.batteryPriorityEnabled()).thenReturn(true);
         when(config.batteryPriorityThreshold()).thenReturn(60);
 
@@ -519,7 +519,7 @@ class HeatingControlServiceTest {
 
         // Then
         // SOC equals threshold, heating priority: full 2000W available
-        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 2000));
+        verify(elwa2Adapter).adjustHeating(argThat(power -> power.getWatts() == 2000));
     }
 
     @Test
@@ -532,11 +532,11 @@ class HeatingControlServiceTest {
         // New logic: production=2000, consumption=0 → 2000W
         BatteryStatus batteryStatus = createBatteryStatus(59, 2000, 0, 0);
 
-        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
-        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(elwa2Adapter.readTemperature1()).thenReturn(currentTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(currentHeatingPower);
+        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
         when(config.batteryPriorityEnabled()).thenReturn(true);
         when(config.batteryPriorityThreshold()).thenReturn(60);
         when(config.batteryReservedPower()).thenReturn(1000);
@@ -546,7 +546,7 @@ class HeatingControlServiceTest {
 
         // Then
         // SOC just below threshold, battery priority: 2000 - 1000 = 1000W
-        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 1000));
+        verify(elwa2Adapter).adjustHeating(argThat(power -> power.getWatts() == 1000));
     }
 
     @Test
@@ -560,11 +560,11 @@ class HeatingControlServiceTest {
         // Battery priority: 5000 - 1000 = 4000W, limited to max 3000W
         BatteryStatus batteryStatus = createBatteryStatus(50, 5000, 0, 0);
 
-        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
-        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(elwa2Adapter.readTemperature1()).thenReturn(currentTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(currentHeatingPower);
+        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
         when(config.batteryPriorityEnabled()).thenReturn(true);
         when(config.batteryPriorityThreshold()).thenReturn(60);
         when(config.batteryReservedPower()).thenReturn(1000);
@@ -576,7 +576,7 @@ class HeatingControlServiceTest {
         // Then
         // adjustedSurplus = 5000W, battery priority: 5000 - 1000 = 4000W, limited to
         // 3000W
-        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 3000));
+        verify(elwa2Adapter).adjustHeating(argThat(power -> power.getWatts() == 3000));
     }
 
     @Test
@@ -589,11 +589,11 @@ class HeatingControlServiceTest {
         // New logic: production=2000, consumption=0 → 2000W
         BatteryStatus batteryStatus = createBatteryStatus(50, 2000, 0, 0);
 
-        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
-        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(elwa2Adapter.readTemperature1()).thenReturn(currentTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(currentHeatingPower);
+        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
         when(config.batteryPriorityEnabled()).thenReturn(true);
         // batteryPriorityThreshold and batteryReservedPower not mocked - not used when
         // override is active
@@ -604,7 +604,7 @@ class HeatingControlServiceTest {
 
         // Then
         // Override active, heating priority: full 2000W available
-        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 2000));
+        verify(elwa2Adapter).adjustHeating(argThat(power -> power.getWatts() == 2000));
     }
 
     @Test
@@ -617,11 +617,11 @@ class HeatingControlServiceTest {
         // New logic: production=2000, consumption=0 → 2000W
         BatteryStatus batteryStatus = createBatteryStatus(50, 2000, 0, 0);
 
-        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
-        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(elwa2Adapter.readTemperature1()).thenReturn(currentTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(currentHeatingPower);
+        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
         when(config.batteryPriorityEnabled()).thenReturn(true);
         when(config.batteryPriorityThreshold()).thenReturn(60);
         when(config.batteryReservedPower()).thenReturn(1000);
@@ -632,7 +632,7 @@ class HeatingControlServiceTest {
 
         // Then
         // Override not active, battery priority: 2000 - 1000 = 1000W
-        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 1000));
+        verify(elwa2Adapter).adjustHeating(argThat(power -> power.getWatts() == 1000));
     }
 
     @Test
@@ -695,16 +695,16 @@ class HeatingControlServiceTest {
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         Power currentHeatingPower = Power.ofWatts(500);
 
-        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
+        when(elwa2Adapter.readTemperature1()).thenReturn(currentTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(currentHeatingPower);
         when(config.temperatureHysteresis()).thenReturn(10.0);
 
         // When
         heatingControlService.controlHeatingSummer();
 
         // Then
-        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 0));
+        verify(elwa2Adapter).adjustHeating(argThat(power -> power.getWatts() == 0));
     }
 
     @Test
@@ -712,9 +712,9 @@ class HeatingControlServiceTest {
         // Given: First reach target temperature (70°C with target 68°C)
         Temperature targetReachedTemp = Temperature.ofCelsius(70.0);
         Temperature targetTemp = Temperature.ofCelsius(68.0);
-        when(heatingRodService.readTemperature1()).thenReturn(targetReachedTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(Power.ofWatts(500));
+        when(elwa2Adapter.readTemperature1()).thenReturn(targetReachedTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(Power.ofWatts(500));
         when(config.temperatureHysteresis()).thenReturn(10.0);
 
         heatingControlService.controlHeatingSummer(); // Enter cooling mode
@@ -722,14 +722,14 @@ class HeatingControlServiceTest {
         // Now temperature drops to 60°C (still above restart threshold of 58°C)
         Temperature coolingTemp = Temperature.ofCelsius(60.0);
 
-        when(heatingRodService.readTemperature1()).thenReturn(coolingTemp);
+        when(elwa2Adapter.readTemperature1()).thenReturn(coolingTemp);
 
         // When
         heatingControlService.controlHeatingSummer();
 
         // Then - should NOT heat (still in cooling mode)
         // Only the first call (entering cooling mode) should have called adjustHeating
-        verify(heatingRodService, never()).adjustHeating(argThat(power -> power.getWatts() > 0));
+        verify(elwa2Adapter, never()).adjustHeating(argThat(power -> power.getWatts() > 0));
     }
 
     @Test
@@ -737,9 +737,9 @@ class HeatingControlServiceTest {
         // Given: First reach target temperature (70°C with target 68°C)
         Temperature targetReachedTemp = Temperature.ofCelsius(70.0);
         Temperature targetTemp = Temperature.ofCelsius(68.0);
-        when(heatingRodService.readTemperature1()).thenReturn(targetReachedTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(Power.ofWatts(500));
+        when(elwa2Adapter.readTemperature1()).thenReturn(targetReachedTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(Power.ofWatts(500));
         when(config.temperatureHysteresis()).thenReturn(10.0);
 
         heatingControlService.controlHeatingSummer(); // Enter cooling mode
@@ -750,16 +750,16 @@ class HeatingControlServiceTest {
         // New logic: production=2000, consumption=0 → 2000W
         BatteryStatus batteryStatus = createBatteryStatus(70, 2000, 0, 0);
 
-        when(heatingRodService.readTemperature1()).thenReturn(restartTemp);
-        when(heatingRodService.readPower()).thenReturn(Power.ofWatts(0));
-        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(elwa2Adapter.readTemperature1()).thenReturn(restartTemp);
+        when(elwa2Adapter.readPower()).thenReturn(Power.ofWatts(0));
+        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
 
         // When
         heatingControlService.controlHeatingSummer();
 
         // Then - should resume heating
-        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 2000));
+        verify(elwa2Adapter).adjustHeating(argThat(power -> power.getWatts() == 2000));
     }
 
     @Test
@@ -772,18 +772,18 @@ class HeatingControlServiceTest {
         // New logic: production=1500, consumption=0 → 1500W
         BatteryStatus batteryStatus = createBatteryStatus(70, 1500, 0, 0);
 
-        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
-        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(elwa2Adapter.readTemperature1()).thenReturn(currentTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(currentHeatingPower);
+        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
         when(config.temperatureHysteresis()).thenReturn(10.0);
 
         // When
         heatingControlService.controlHeatingSummer();
 
         // Then - should heat normally
-        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 1500));
+        verify(elwa2Adapter).adjustHeating(argThat(power -> power.getWatts() == 1500));
     }
 
     @Test
@@ -791,9 +791,9 @@ class HeatingControlServiceTest {
         // Given: Custom hysteresis of 5°C
         Temperature targetReachedTemp = Temperature.ofCelsius(70.0);
         Temperature targetTemp = Temperature.ofCelsius(68.0);
-        when(heatingRodService.readTemperature1()).thenReturn(targetReachedTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(Power.ofWatts(500));
+        when(elwa2Adapter.readTemperature1()).thenReturn(targetReachedTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(Power.ofWatts(500));
         when(config.temperatureHysteresis()).thenReturn(5.0); // 5°C hysteresis
 
         heatingControlService.controlHeatingSummer(); // Enter cooling mode
@@ -804,26 +804,26 @@ class HeatingControlServiceTest {
         // New logic: production=2000, consumption=0 → 2000W
         BatteryStatus batteryStatus = createBatteryStatus(70, 2000, 0, 0);
 
-        when(heatingRodService.readTemperature1()).thenReturn(stillCoolingTemp);
-        when(heatingRodService.readPower()).thenReturn(Power.ofWatts(0));
-        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(elwa2Adapter.readTemperature1()).thenReturn(stillCoolingTemp);
+        when(elwa2Adapter.readPower()).thenReturn(Power.ofWatts(0));
+        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
 
         // When
         heatingControlService.controlHeatingSummer();
 
         // Then - should NOT heat (still above 63°C restart threshold)
-        verify(heatingRodService, never()).adjustHeating(argThat(power -> power.getWatts() > 0));
+        verify(elwa2Adapter, never()).adjustHeating(argThat(power -> power.getWatts() > 0));
 
         // Now temperature drops to 62°C (below restart threshold of 63°C)
         Temperature restartTemp = Temperature.ofCelsius(62.0);
-        when(heatingRodService.readTemperature1()).thenReturn(restartTemp);
+        when(elwa2Adapter.readTemperature1()).thenReturn(restartTemp);
 
         // When
         heatingControlService.controlHeatingSummer();
 
         // Then - should resume heating
-        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 2000));
+        verify(elwa2Adapter).adjustHeating(argThat(power -> power.getWatts() == 2000));
     }
 
     // ==================== Manual Mode Tests ====================
@@ -835,9 +835,9 @@ class HeatingControlServiceTest {
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         Power currentHeatingPower = Power.ofWatts(500);
 
-        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
+        when(elwa2Adapter.readTemperature1()).thenReturn(currentTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(currentHeatingPower);
         // Note: Battery mocks not needed - manual mode returns early before surplus check
 
         // When: Manual mode is activated
@@ -845,7 +845,7 @@ class HeatingControlServiceTest {
         heatingControlService.controlHeatingSummer();
 
         // Then: Automatic control should NOT adjust heating
-        verify(heatingRodService, never()).adjustHeating(any());
+        verify(elwa2Adapter, never()).adjustHeating(any());
         assertTrue(heatingControlService.isManualModeActive());
     }
 
@@ -856,9 +856,9 @@ class HeatingControlServiceTest {
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         Power currentHeatingPower = Power.ofWatts(1000);
 
-        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
+        when(elwa2Adapter.readTemperature1()).thenReturn(currentTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(currentHeatingPower);
 
         // When: Manual mode is active and control runs
         heatingControlService.activateManualMode();
@@ -869,7 +869,7 @@ class HeatingControlServiceTest {
         // Then: Automatic control stays fully suspended - the external controller (not
         // HeatingControlService) is responsible for the heating rod while in manual mode
         assertTrue(heatingControlService.isManualModeActive());
-        verify(heatingRodService, never()).adjustHeating(any());
+        verify(elwa2Adapter, never()).adjustHeating(any());
     }
 
     @Test
@@ -881,11 +881,11 @@ class HeatingControlServiceTest {
         Power currentHeatingPower = Power.ofWatts(0);
         BatteryStatus batteryStatus = createBatteryStatus(70, 1500, 0, 0);
 
-        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
-        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(elwa2Adapter.readTemperature1()).thenReturn(currentTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(currentHeatingPower);
+        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
 
         // When: Manual mode is activated and then deactivated
         heatingControlService.activateManualMode();
@@ -894,7 +894,7 @@ class HeatingControlServiceTest {
 
         // Then: Automatic control should resume and adjust heating
         assertFalse(heatingControlService.isManualModeActive());
-        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 1500));
+        verify(elwa2Adapter).adjustHeating(argThat(power -> power.getWatts() == 1500));
     }
 
     @Test
@@ -906,18 +906,18 @@ class HeatingControlServiceTest {
         Power currentHeatingPower = Power.ofWatts(0);
         BatteryStatus batteryStatus = createBatteryStatus(70, 1000, 0, 0);
 
-        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
-        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(elwa2Adapter.readTemperature1()).thenReturn(currentTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(currentHeatingPower);
+        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
 
         // When: Control runs without manual mode
         heatingControlService.controlHeatingSummer();
 
         // Then: Automatic control should adjust heating
         assertFalse(heatingControlService.isManualModeActive());
-        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 1000));
+        verify(elwa2Adapter).adjustHeating(argThat(power -> power.getWatts() == 1000));
     }
 
     @Test
@@ -927,9 +927,9 @@ class HeatingControlServiceTest {
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         Power currentHeatingPower = Power.ofWatts(1000);
 
-        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
+        when(elwa2Adapter.readTemperature1()).thenReturn(currentTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(currentHeatingPower);
 
         // When: Manual mode is active and control runs
         heatingControlService.activateManualMode();
@@ -937,7 +937,7 @@ class HeatingControlServiceTest {
 
         // Then: Manual mode should remain active and no automatic adjustment
         assertTrue(heatingControlService.isManualModeActive());
-        verify(heatingRodService, never()).adjustHeating(any());
+        verify(elwa2Adapter, never()).adjustHeating(any());
     }
 
     @Test
@@ -1023,18 +1023,18 @@ class HeatingControlServiceTest {
         Power currentHeatingPower = Power.ofWatts(0);
         BatteryStatus batteryStatus = createBatteryStatus(70, 2000, 0, 0);
 
-        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
-        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(elwa2Adapter.readTemperature1()).thenReturn(currentTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(currentHeatingPower);
+        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
         when(config.solarPowerReductionPercent()).thenReturn(5);
 
         // When
         heatingControlService.controlHeatingSummer();
 
         // Then: 2000W - 5% = 1900W
-        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 1900));
+        verify(elwa2Adapter).adjustHeating(argThat(power -> power.getWatts() == 1900));
     }
 
     @Test
@@ -1046,18 +1046,18 @@ class HeatingControlServiceTest {
         Power currentHeatingPower = Power.ofWatts(0);
         BatteryStatus batteryStatus = createBatteryStatus(70, 2000, 0, 0);
 
-        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
-        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(elwa2Adapter.readTemperature1()).thenReturn(currentTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(currentHeatingPower);
+        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
         when(config.solarPowerReductionPercent()).thenReturn(0);
 
         // When
         heatingControlService.controlHeatingSummer();
 
         // Then: No reduction, full 2000W
-        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 2000));
+        verify(elwa2Adapter).adjustHeating(argThat(power -> power.getWatts() == 2000));
     }
 
     @Test
@@ -1069,18 +1069,18 @@ class HeatingControlServiceTest {
         Power currentHeatingPower = Power.ofWatts(0);
         BatteryStatus batteryStatus = createBatteryStatus(70, 2000, 0, 0);
 
-        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
-        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(elwa2Adapter.readTemperature1()).thenReturn(currentTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(currentHeatingPower);
+        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
         when(config.solarPowerReductionPercent()).thenReturn(10);
 
         // When
         heatingControlService.controlHeatingSummer();
 
         // Then: 2000W - 10% = 1800W
-        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 1800));
+        verify(elwa2Adapter).adjustHeating(argThat(power -> power.getWatts() == 1800));
     }
 
     @Test
@@ -1093,18 +1093,18 @@ class HeatingControlServiceTest {
         Power currentHeatingPower = Power.ofWatts(0);
         BatteryStatus batteryStatus = createBatteryStatus(70, 4000, 0, 0);
 
-        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
-        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(elwa2Adapter.readTemperature1()).thenReturn(currentTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(currentHeatingPower);
+        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
         when(config.solarPowerReductionPercent()).thenReturn(5);
 
         // When
         heatingControlService.controlHeatingSummer();
 
         // Then: 4000W - 5% = 3800W, then limited to max 2900W
-        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 2900));
+        verify(elwa2Adapter).adjustHeating(argThat(power -> power.getWatts() == 2900));
     }
 
     @Test
@@ -1116,18 +1116,18 @@ class HeatingControlServiceTest {
         Power currentHeatingPower = Power.ofWatts(0); // Not currently heating
         BatteryStatus batteryStatus = createBatteryStatus(70, 150, 0, 0);
 
-        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
-        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(elwa2Adapter.readTemperature1()).thenReturn(currentTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(currentHeatingPower);
+        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
         when(config.solarPowerReductionPercent()).thenReturn(40); // 150 - 40% = 90W < 100W min
 
         // When
         heatingControlService.controlHeatingSummer();
 
         // Then: 150W - 40% = 90W < 100W minimum → should not start heating
-        verify(heatingRodService, never()).adjustHeating(any());
+        verify(elwa2Adapter, never()).adjustHeating(any());
     }
 
     @Test
@@ -1140,11 +1140,11 @@ class HeatingControlServiceTest {
         Power currentHeatingPower = Power.ofWatts(0);
         BatteryStatus batteryStatus = createBatteryStatus(50, 3000, 0, 0); // SOC below threshold
 
-        when(heatingRodService.readTemperature1()).thenReturn(currentTemp);
-        when(heatingRodService.readTargetTemperature()).thenReturn(targetTemp);
-        when(heatingRodService.readPower()).thenReturn(currentHeatingPower);
-        when(batteryStorageService.determineSolarPowerSurplus()).thenReturn(baseSurplus);
-        when(batteryStorageService.getCurrentStatus()).thenReturn(batteryStatus);
+        when(elwa2Adapter.readTemperature1()).thenReturn(currentTemp);
+        when(elwa2Adapter.readTargetTemperature()).thenReturn(targetTemp);
+        when(elwa2Adapter.readPower()).thenReturn(currentHeatingPower);
+        when(e3dcAdapter.determineSolarPowerSurplus()).thenReturn(baseSurplus);
+        when(e3dcAdapter.getCurrentStatus()).thenReturn(batteryStatus);
         when(config.batteryPriorityEnabled()).thenReturn(true);
         when(config.batteryPriorityThreshold()).thenReturn(60);
         when(config.batteryReservedPower()).thenReturn(1000);
@@ -1154,7 +1154,7 @@ class HeatingControlServiceTest {
         heatingControlService.controlHeatingSummer();
 
         // Then: 3000W - 1000W reserved = 2000W, then 5% reduction = 1900W
-        verify(heatingRodService).adjustHeating(argThat(power -> power.getWatts() == 1900));
+        verify(elwa2Adapter).adjustHeating(argThat(power -> power.getWatts() == 1900));
     }
 
     // Helper method to create BatteryStatus with specific SOC (legacy - all power

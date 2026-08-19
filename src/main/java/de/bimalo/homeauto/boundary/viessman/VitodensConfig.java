@@ -1,4 +1,4 @@
-package de.bimalo.homeauto.control.gasheating;
+package de.bimalo.homeauto.boundary.viessman;
 
 import io.smallrye.config.ConfigMapping;
 import io.smallrye.config.WithDefault;
@@ -9,8 +9,8 @@ import jakarta.validation.constraints.NotBlank;
 /**
  * Configuration for the heating system.
  */
-@ConfigMapping(prefix = "gasheating")
-public interface GasHeatingConfig {
+@ConfigMapping(prefix = "vitodens")
+public interface VitodensConfig {
 
     /**
      * Modbus-spezifische Konfiguration.

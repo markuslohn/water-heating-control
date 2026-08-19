@@ -51,25 +51,25 @@ All configuration settings are defined in `src/main/resources/application.proper
 
 ```properties
 # Battery Storage (E3/DC) Modbus TCP Configuration
-battery.modbus.host=192.168.1.48
-battery.modbus.port=502
+e3dc.modbus.host=192.168.1.48
+e3dc.modbus.port=502
 
 # Heating Rod (ELWA2) Modbus TCP Configuration
-heatingrod.modbus.host=192.168.1.2
-heatingrod.modbus.port=502
+elwa2.modbus.host=192.168.1.2
+elwa2.modbus.port=502
 
 # Heating System (Viessmann) Modbus TCP Configuration
-gasheating.modbus.host=192.168.1.3
-gasheating.modbus.port=502
+vitodens.modbus.host=192.168.1.3
+vitodens.modbus.port=502
 
 # Interval at which the external Modbus request is refreshed while gas heating
 # is active (the Vitodens falls back to internal control if not refreshed).
 # Supports duration expressions: "1m", "30s", "2m30s"
-gasheating.keep-alive-interval=20s
+vitodens.keep-alive-interval=20s
 
 # Wallbox (go-eCharger) Modbus TCP Configuration
-wallbox.modbus.host=192.168.1.4
-wallbox.modbus.port=502
+goecharger.modbus.host=192.168.1.4
+goecharger.modbus.port=502
 ```
 
 ### Heating Control Settings
@@ -327,8 +327,8 @@ Access at `http://localhost:8080/q/health`
 ### Key Components
 
 - **HeatingControlService**: Seasonal schedulers that check and adjust heating based on time of year
-- **HeatingRodService**: Interface to the ELWA2 heating rod (Modbus communication)
-- **BatteryStorageService**: Interface to the E3/DC battery storage (Modbus communication)
+- **Elwa2Adapter**: Interface to the ELWA2 heating rod (Modbus communication)
+- **E3dcAdapter**: Interface to the E3/DC battery storage (Modbus communication)
 - **REST Resources**: Web API for monitoring and manual control
 - **Web UI**: Responsive single-page application for user interface
 - **Seasonal Predicates**: Control which seasons are active (WinterDisabledPredicate, etc.)

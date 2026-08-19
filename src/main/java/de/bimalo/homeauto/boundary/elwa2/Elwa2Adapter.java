@@ -1,7 +1,5 @@
-package de.bimalo.homeauto.control.heatingrod;
+package de.bimalo.homeauto.boundary.elwa2;
 
-import de.bimalo.homeauto.boundary.elwa2.Elwa2ModbusClient;
-import de.bimalo.homeauto.boundary.elwa2.Elwa2Status;
 import de.bimalo.homeauto.entity.Power;
 import de.bimalo.homeauto.entity.Temperature;
 import io.quarkus.scheduler.Scheduled;
@@ -25,12 +23,12 @@ import org.eclipse.microprofile.faulttolerance.Timeout;
  */
 @Slf4j
 @ApplicationScoped
-public class HeatingRodService {
+public class Elwa2Adapter {
 
     private static final Duration DEFAULT_POWER_TIMEOUT = Duration.ofMinutes(1);
 
     private final Elwa2ModbusClient modbusClient;
-    private final HeatingRodConfig config;
+    private final Elwa2Config config;
 
     // Cached values for fallback when circuit is open
     private volatile Temperature lastKnownTemperature1 = Temperature.ofCelsius(20.0);
@@ -45,11 +43,11 @@ public class HeatingRodService {
     private volatile Instant lastPowerRequestAt = Instant.EPOCH;
 
     @Inject
-    public HeatingRodService(HeatingRodConfig config) {
+    public Elwa2Adapter(Elwa2Config config) {
         this(config, new Elwa2ModbusClient(config.modbus().host(), config.modbus().port()));
     }
 
-    HeatingRodService(HeatingRodConfig config, Elwa2ModbusClient modbusClient) {
+    Elwa2Adapter(Elwa2Config config, Elwa2ModbusClient modbusClient) {
         this.config = config;
         this.modbusClient = modbusClient;
     }
@@ -206,7 +204,7 @@ public class HeatingRodService {
      * need to call {@link #adjustHeating(Power)} once. Does nothing while no
      * heating power is requested.
      */
-    @Scheduled(every = "{heatingrod.keep-alive-check-interval}")
+    @Scheduled(every = "{elwa2.keep-alive-check-interval}")
     public void keepHeatingAlive() {
         if (!lastRequestedPower.isPositive()) {
             return;

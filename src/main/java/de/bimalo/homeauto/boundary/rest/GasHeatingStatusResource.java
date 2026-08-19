@@ -1,6 +1,6 @@
 package de.bimalo.homeauto.boundary.rest;
 
-import de.bimalo.homeauto.control.gasheating.GasHeatingService;
+import de.bimalo.homeauto.boundary.viessman.VitodensAdapter;
 import de.bimalo.homeauto.entity.GasHeatingStatus;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
@@ -18,7 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 public class GasHeatingStatusResource {
 
     @Inject
-    GasHeatingService gasHeatingService;
+    VitodensAdapter vitodensAdapter;
 
     /**
      * Gets the current gas heating status.
@@ -30,9 +30,9 @@ public class GasHeatingStatusResource {
     public GasHeatingStatus getStatus() {
         log.debug("REST: Getting gas heating status");
         return GasHeatingStatus.builder()
-                .active(gasHeatingService.isHeatingActive())
-                .currentTemperature(gasHeatingService.readHotWaterCurrentTemperature())
-                .targetTemperature(gasHeatingService.readHotWaterTargetTemperature())
+                .active(vitodensAdapter.isHeatingActive())
+                .currentTemperature(vitodensAdapter.readHotWaterCurrentTemperature())
+                .targetTemperature(vitodensAdapter.readHotWaterTargetTemperature())
                 .build();
     }
 }

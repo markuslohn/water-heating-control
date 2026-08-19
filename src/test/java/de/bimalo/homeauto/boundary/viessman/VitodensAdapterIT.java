@@ -1,25 +1,24 @@
-package de.bimalo.homeauto.control.gasheating;
+package de.bimalo.homeauto.boundary.viessman;
 
-import de.bimalo.homeauto.boundary.viessman.VitodensModbusClient;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
- * Manual integration test for GasHeatingService.
+ * Manual integration test for VitodensAdapter.
  * Communicates with the actual Vitodens gas heating system, no assertions -
  * intended for manual activation/deactivation of hot water production.
  */
 @Tag("integration")
-class GasHeatingServiceIT {
+class VitodensAdapterIT {
 
-    private GasHeatingService service;
+    private VitodensAdapter service;
 
     @BeforeEach
     void setUp() {
         VitodensModbusClient client = new VitodensModbusClient("192.168.200.64", 502);
-        service = new GasHeatingService(null, client);
+        service = new VitodensAdapter(null, client);
         service.initialize();
     }
 
@@ -39,7 +38,7 @@ class GasHeatingServiceIT {
         service.activateHeating();
         System.out.println("Heating active after: " + service.isHeatingActive());
 
-        // GasHeatingService's @Scheduled keep-alive only runs inside a managed
+        // VitodensAdapter's @Scheduled keep-alive only runs inside a managed
         // Quarkus context, which this manual test deliberately doesn't bootstrap.
         // The Vitodens falls back to internal control if the external request
         // isn't refreshed within 25 seconds, so it is refreshed here explicitly

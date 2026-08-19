@@ -1,7 +1,7 @@
 package de.bimalo.homeauto.control.heatingcontrol;
 
-import de.bimalo.homeauto.control.battery.BatteryStorageService;
-import de.bimalo.homeauto.control.heatingrod.HeatingRodService;
+import de.bimalo.homeauto.boundary.e3dc.E3dcAdapter;
+import de.bimalo.homeauto.boundary.elwa2.Elwa2Adapter;
 import de.bimalo.homeauto.entity.BatteryStatus;
 import de.bimalo.homeauto.entity.Power;
 import de.bimalo.homeauto.entity.Season;
@@ -23,8 +23,8 @@ import lombok.extern.slf4j.Slf4j;
 public class HeatingControlService {
 
     private final HeatingControlConfig config;
-    private final BatteryStorageService batteryStorageService;
-    private final HeatingRodService heatingRodService;
+    private final E3dcAdapter e3dcAdapter;
+    private final Elwa2Adapter elwa2Adapter;
 
     // Runtime override for battery priority (resets at midnight)
     private final AtomicBoolean batteryPriorityRuntimeOverride = new AtomicBoolean(false);
@@ -43,11 +43,11 @@ public class HeatingControlService {
     @Inject
     public HeatingControlService(
             HeatingControlConfig config,
-            BatteryStorageService batteryStorageService,
-            HeatingRodService heatingRodService) {
+            E3dcAdapter e3dcAdapter,
+            Elwa2Adapter elwa2Adapter) {
         this.config = config;
-        this.batteryStorageService = batteryStorageService;
-        this.heatingRodService = heatingRodService;
+        this.e3dcAdapter = e3dcAdapter;
+        this.elwa2Adapter = elwa2Adapter;
     }
 
     /**
@@ -102,7 +102,7 @@ public class HeatingControlService {
         try {
             // Read current heating power once per control cycle to avoid multiple service
             // calls
-            Power currentHeatingPower = heatingRodService.readPower();
+            Power currentHeatingPower = elwa2Adapter.readPower();
             TemperatureCheck tempCheck = checkTemperature();
 
             // Manual mode: automatic control is fully suspended. An external controller
@@ -163,8 +163,8 @@ public class HeatingControlService {
      * @return TemperatureCheck containing current and target temperatures
      */
     private TemperatureCheck checkTemperature() {
-        Temperature currentTemperature = heatingRodService.readTemperature1();
-        Temperature targetTemperature = heatingRodService.readTargetTemperature();
+        Temperature currentTemperature = elwa2Adapter.readTemperature1();
+        Temperature targetTemperature = elwa2Adapter.readTargetTemperature();
 
         log.debug("Current temperature: {}°C, Target temperature: {}°C",
                 currentTemperature.getCelsius(), targetTemperature.getCelsius());
@@ -247,8 +247,8 @@ public class HeatingControlService {
      *         heating
      */
     private Power checkSurplusPower(Power currentHeatingPower) {
-        BatteryStatus batteryStatus = batteryStorageService.getCurrentStatus();
-        Power baseSurplus = batteryStorageService.determineSolarPowerSurplus();
+        BatteryStatus batteryStatus = e3dcAdapter.getCurrentStatus();
+        Power baseSurplus = e3dcAdapter.determineSolarPowerSurplus();
         PowerCalculationContext ctx = new PowerCalculationContext(batteryStatus, currentHeatingPower);
 
         Power adjustedSurplus = calculateAdjustedSurplus(ctx);
@@ -384,7 +384,7 @@ public class HeatingControlService {
     private void stopHeating(String reason, Power currentHeatingPower) {
         if (currentHeatingPower.isPositive()) {
             log.info("Stopping heating: {}", reason);
-            heatingRodService.adjustHeating(Power.ZERO);
+            elwa2Adapter.adjustHeating(Power.ZERO);
         }
     }
 
@@ -397,7 +397,7 @@ public class HeatingControlService {
     private void adjustHeatingPower(Power surplusPower, TemperatureCheck tempCheck) {
         log.info("Adjusting heating to {} W (temperature: {}°C, target: {}°C)",
                 surplusPower.getWatts(), tempCheck.currentCelsius(), tempCheck.targetCelsius());
-        heatingRodService.adjustHeating(surplusPower);
+        elwa2Adapter.adjustHeating(surplusPower);
     }
 
     /**

@@ -1,8 +1,8 @@
 package de.bimalo.homeauto.control.temperatureprotocol;
 
+import de.bimalo.homeauto.boundary.elwa2.Elwa2Adapter;
 import de.bimalo.homeauto.boundary.temperatureprotocol.TemperatureProtocolFileWriter;
-import de.bimalo.homeauto.control.gasheating.GasHeatingService;
-import de.bimalo.homeauto.control.heatingrod.HeatingRodService;
+import de.bimalo.homeauto.boundary.viessman.VitodensAdapter;
 import de.bimalo.homeauto.entity.TemperatureLogEntry;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -20,19 +20,19 @@ import lombok.extern.slf4j.Slf4j;
 public class TemperatureProtocolService {
 
     private final TemperatureProtocolConfig config;
-    private final HeatingRodService heatingRodService;
-    private final GasHeatingService gasHeatingService;
+    private final Elwa2Adapter elwa2Adapter;
+    private final VitodensAdapter vitodensAdapter;
     private final TemperatureProtocolFileWriter fileWriter;
 
     @Inject
     public TemperatureProtocolService(
             TemperatureProtocolConfig config,
-            HeatingRodService heatingRodService,
-            GasHeatingService gasHeatingService,
+            Elwa2Adapter elwa2Adapter,
+            VitodensAdapter vitodensAdapter,
             TemperatureProtocolFileWriter fileWriter) {
         this.config = config;
-        this.heatingRodService = heatingRodService;
-        this.gasHeatingService = gasHeatingService;
+        this.elwa2Adapter = elwa2Adapter;
+        this.vitodensAdapter = vitodensAdapter;
         this.fileWriter = fileWriter;
     }
 
@@ -45,8 +45,8 @@ public class TemperatureProtocolService {
         try {
             TemperatureLogEntry entry = TemperatureLogEntry.builder()
                     .timestamp(Instant.now())
-                    .heatingRodTemperature(heatingRodService.readTemperature1())
-                    .gasHeatingTemperature(gasHeatingService.readHotWaterCurrentTemperature())
+                    .heatingRodTemperature(elwa2Adapter.readTemperature1())
+                    .gasHeatingTemperature(vitodensAdapter.readHotWaterCurrentTemperature())
                     .build();
             fileWriter.append(entry);
         } catch (Exception e) {

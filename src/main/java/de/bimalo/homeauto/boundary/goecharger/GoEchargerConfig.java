@@ -1,4 +1,4 @@
-package de.bimalo.homeauto.control.battery;
+package de.bimalo.homeauto.boundary.goecharger;
 
 import io.smallrye.config.ConfigMapping;
 import io.smallrye.config.WithDefault;
@@ -7,28 +7,22 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 
 /**
- * Konfiguration für den E3/DC Batteriespeicher.
+ * Configuration for go-eCharger wallbox.
  */
-@ConfigMapping(prefix = "battery")
-public interface BatteryStorageConfig {
+@ConfigMapping(prefix = "goecharger")
+public interface GoEchargerConfig {
 
-    /**
-     * Modbus-spezifische Konfiguration.
-     */
     ModbusConfig modbus();
 
-    /**
-     * Modbus Konfiguration.
-     */
     interface ModbusConfig {
         /**
-         * IP-Adresse oder Hostname des E3/DC Systems.
+         * IP or hostname of the go-eCharger wallbox.
          */
         @NotBlank
         String host();
 
         /**
-         * TCP-Port des E3/DC Systems.
+         * TCP-Port des go-eCharger wallbox.
          */
         @Min(1)
         @Max(65535)

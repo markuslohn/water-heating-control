@@ -1,10 +1,10 @@
 package de.bimalo.homeauto.control.manualwaterheating;
 
-import de.bimalo.homeauto.control.battery.BatteryStorageService;
-import de.bimalo.homeauto.control.gasheating.GasHeatingService;
+import de.bimalo.homeauto.boundary.e3dc.E3dcAdapter;
+import de.bimalo.homeauto.boundary.elwa2.Elwa2Adapter;
+import de.bimalo.homeauto.boundary.viessman.VitodensAdapter;
 import de.bimalo.homeauto.control.heatingcontrol.HeatingControlConfig;
 import de.bimalo.homeauto.control.heatingcontrol.HeatingControlService;
-import de.bimalo.homeauto.control.heatingrod.HeatingRodService;
 import de.bimalo.homeauto.entity.BatteryStatus;
 import de.bimalo.homeauto.entity.HeatingSource;
 import de.bimalo.homeauto.entity.ManualWaterHeatingStatus;
@@ -36,9 +36,9 @@ public class ManualWaterHeatingService {
     private final ManualWaterHeatingConfig config;
     private final HeatingControlConfig heatingControlConfig;
     private final HeatingControlService heatingControlService;
-    private final BatteryStorageService batteryStorageService;
-    private final HeatingRodService heatingRodService;
-    private final GasHeatingService gasHeatingService;
+    private final E3dcAdapter e3dcAdapter;
+    private final Elwa2Adapter elwa2Adapter;
+    private final VitodensAdapter vitodensAdapter;
 
     private final AtomicBoolean active = new AtomicBoolean(false);
 
@@ -59,15 +59,15 @@ public class ManualWaterHeatingService {
             ManualWaterHeatingConfig config,
             HeatingControlConfig heatingControlConfig,
             HeatingControlService heatingControlService,
-            BatteryStorageService batteryStorageService,
-            HeatingRodService heatingRodService,
-            GasHeatingService gasHeatingService) {
+            E3dcAdapter e3dcAdapter,
+            Elwa2Adapter elwa2Adapter,
+            VitodensAdapter vitodensAdapter) {
         this.config = config;
         this.heatingControlConfig = heatingControlConfig;
         this.heatingControlService = heatingControlService;
-        this.batteryStorageService = batteryStorageService;
-        this.heatingRodService = heatingRodService;
-        this.gasHeatingService = gasHeatingService;
+        this.e3dcAdapter = e3dcAdapter;
+        this.elwa2Adapter = elwa2Adapter;
+        this.vitodensAdapter = vitodensAdapter;
     }
 
     /**
@@ -90,9 +90,9 @@ public class ManualWaterHeatingService {
      */
     public void deactivate() {
         if (active.compareAndSet(true, false)) {
-            heatingRodService.adjustHeating(Power.ZERO);
-            if (gasHeatingService.isHeatingActive()) {
-                gasHeatingService.deactivateHeating();
+            elwa2Adapter.adjustHeating(Power.ZERO);
+            if (vitodensAdapter.isHeatingActive()) {
+                vitodensAdapter.deactivateHeating();
             }
             currentSource = HeatingSource.NONE;
             heatingControlService.deactivateManualMode();
@@ -120,11 +120,11 @@ public class ManualWaterHeatingService {
     }
 
     private void runCycle() {
-        Temperature rodCurrentTemp = heatingRodService.readTemperature1();
-        Temperature rodTargetTemp = heatingRodService.readTargetTemperature();
+        Temperature rodCurrentTemp = elwa2Adapter.readTemperature1();
+        Temperature rodTargetTemp = elwa2Adapter.readTargetTemperature();
 
         HeatingDecision decision = determineElectricHeatingPower(rodCurrentTemp, rodTargetTemp);
-        heatingRodService.adjustHeating(decision.power());
+        elwa2Adapter.adjustHeating(decision.power());
         currentSource = decision.source();
 
         if (rodTargetReached.get()) {
@@ -134,8 +134,8 @@ public class ManualWaterHeatingService {
         }
 
         if (decision.power().isPositive()) {
-            if (gasHeatingService.isHeatingActive()) {
-                gasHeatingService.deactivateHeating();
+            if (vitodensAdapter.isHeatingActive()) {
+                vitodensAdapter.deactivateHeating();
             }
             gasAssistActive.set(false);
             return;
@@ -155,9 +155,9 @@ public class ManualWaterHeatingService {
             return new HeatingDecision(Power.ZERO, HeatingSource.NONE);
         }
 
-        Power pvSurplus = batteryStorageService.determineSolarPowerSurplus();
+        Power pvSurplus = e3dcAdapter.determineSolarPowerSurplus();
 
-        BatteryStatus batteryStatus = batteryStorageService.getCurrentStatus();
+        BatteryStatus batteryStatus = e3dcAdapter.getCurrentStatus();
         updateBatteryAssistState(rodCurrentTemp, batteryStatus.getBatteryStateOfCharge().getValue());
 
         Power batteryPower = batteryAssistActive.get()
@@ -238,8 +238,8 @@ public class ManualWaterHeatingService {
      */
     private boolean manageGasFallback() {
         boolean wasActive = gasAssistActive.get();
-        Temperature gasCurrentTemp = gasHeatingService.readHotWaterCurrentTemperature();
-        Temperature gasTargetTemp = gasHeatingService.readHotWaterTargetTemperature();
+        Temperature gasCurrentTemp = vitodensAdapter.readHotWaterCurrentTemperature();
+        Temperature gasTargetTemp = vitodensAdapter.readHotWaterTargetTemperature();
         double shutoffTemp = gasTargetTemp.getCelsius() - config.gasHeatingShutoffTemperatureOffset();
 
         if (gasCurrentTemp.getCelsius() >= shutoffTemp) {
@@ -250,11 +250,11 @@ public class ManualWaterHeatingService {
         }
 
         if (gasAssistActive.get()) {
-            gasHeatingService.activateHeating();
+            vitodensAdapter.activateHeating();
             currentSource = HeatingSource.GAS;
         } else {
-            if (gasHeatingService.isHeatingActive()) {
-                gasHeatingService.deactivateHeating();
+            if (vitodensAdapter.isHeatingActive()) {
+                vitodensAdapter.deactivateHeating();
             }
             currentSource = HeatingSource.NONE;
         }

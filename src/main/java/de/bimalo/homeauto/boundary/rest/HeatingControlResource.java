@@ -1,7 +1,7 @@
 package de.bimalo.homeauto.boundary.rest;
 
+import de.bimalo.homeauto.boundary.elwa2.Elwa2Adapter;
 import de.bimalo.homeauto.control.heatingcontrol.HeatingControlService;
-import de.bimalo.homeauto.control.heatingrod.HeatingRodService;
 import de.bimalo.homeauto.entity.Season;
 import de.bimalo.homeauto.entity.HeatingStatus;
 import de.bimalo.homeauto.entity.Power;
@@ -22,7 +22,7 @@ import lombok.extern.slf4j.Slf4j;
 public class HeatingControlResource {
 
     @Inject
-    HeatingRodService heatingRodService;
+    Elwa2Adapter elwa2Adapter;
 
     @Inject
     HeatingControlService heatingControlService;
@@ -37,9 +37,9 @@ public class HeatingControlResource {
     public HeatingStatus getStatus() {
         log.debug("REST: Getting heating status");
 
-        Power power = heatingRodService.readPower();
-        Temperature currentTemp = heatingRodService.readTemperature1();
-        Temperature targetTemp = heatingRodService.readTargetTemperature();
+        Power power = elwa2Adapter.readPower();
+        Temperature currentTemp = elwa2Adapter.readTemperature1();
+        Temperature targetTemp = elwa2Adapter.readTargetTemperature();
         Season currentSeason = heatingControlService.getCurrentSeason();
 
         return HeatingStatus.builder()

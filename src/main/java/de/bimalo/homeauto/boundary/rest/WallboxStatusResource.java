@@ -1,6 +1,6 @@
 package de.bimalo.homeauto.boundary.rest;
 
-import de.bimalo.homeauto.control.wallbox.WallboxService;
+import de.bimalo.homeauto.boundary.goecharger.GoEchargerAdapter;
 import de.bimalo.homeauto.entity.WallboxStatus;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
@@ -18,7 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 public class WallboxStatusResource {
 
     @Inject
-    WallboxService wallboxService;
+    GoEchargerAdapter goEchargerAdapter;
 
     /**
      * Gets the current wallbox charging status.
@@ -30,8 +30,8 @@ public class WallboxStatusResource {
     public WallboxStatus getStatus() {
         log.debug("REST: Getting wallbox status");
         return WallboxStatus.builder()
-                .charging(wallboxService.isCharging())
-                .chargingPower(wallboxService.readCurrentChargingPower())
+                .charging(goEchargerAdapter.isCharging())
+                .chargingPower(goEchargerAdapter.readCurrentChargingPower())
                 .build();
     }
 }

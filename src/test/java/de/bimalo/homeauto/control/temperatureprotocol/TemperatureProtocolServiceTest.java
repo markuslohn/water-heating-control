@@ -7,9 +7,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.bimalo.homeauto.boundary.elwa2.Elwa2Adapter;
 import de.bimalo.homeauto.boundary.temperatureprotocol.TemperatureProtocolFileWriter;
-import de.bimalo.homeauto.control.gasheating.GasHeatingService;
-import de.bimalo.homeauto.control.heatingrod.HeatingRodService;
+import de.bimalo.homeauto.boundary.viessman.VitodensAdapter;
 import de.bimalo.homeauto.entity.Temperature;
 import de.bimalo.homeauto.entity.TemperatureLogEntry;
 import org.junit.jupiter.api.Test;
@@ -26,10 +26,10 @@ class TemperatureProtocolServiceTest {
     private TemperatureProtocolConfig config;
 
     @Mock
-    private HeatingRodService heatingRodService;
+    private Elwa2Adapter elwa2Adapter;
 
     @Mock
-    private GasHeatingService gasHeatingService;
+    private VitodensAdapter vitodensAdapter;
 
     @Mock
     private TemperatureProtocolFileWriter fileWriter;
@@ -43,15 +43,15 @@ class TemperatureProtocolServiceTest {
 
         service.recordTemperatures();
 
-        verify(heatingRodService, never()).readTemperature1();
+        verify(elwa2Adapter, never()).readTemperature1();
         verify(fileWriter, never()).append(any());
     }
 
     @Test
     void recordTemperatures_writesEntryWithBothTemperatures_whenEnabled() {
         when(config.enabled()).thenReturn(true);
-        when(heatingRodService.readTemperature1()).thenReturn(Temperature.ofCelsius(62.5));
-        when(gasHeatingService.readHotWaterCurrentTemperature()).thenReturn(Temperature.ofCelsius(58.0));
+        when(elwa2Adapter.readTemperature1()).thenReturn(Temperature.ofCelsius(62.5));
+        when(vitodensAdapter.readHotWaterCurrentTemperature()).thenReturn(Temperature.ofCelsius(58.0));
 
         service.recordTemperatures();
 
@@ -66,7 +66,7 @@ class TemperatureProtocolServiceTest {
     @Test
     void recordTemperatures_swallowsException_whenReadingTemperatureFails() {
         when(config.enabled()).thenReturn(true);
-        when(heatingRodService.readTemperature1()).thenThrow(new RuntimeException("Modbus timeout"));
+        when(elwa2Adapter.readTemperature1()).thenThrow(new RuntimeException("Modbus timeout"));
 
         assertDoesNotThrow(() -> service.recordTemperatures());
 
