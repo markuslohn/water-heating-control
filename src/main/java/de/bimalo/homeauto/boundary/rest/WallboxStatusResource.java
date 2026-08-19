@@ -6,6 +6,7 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.ServiceUnavailableException;
 import jakarta.ws.rs.core.MediaType;
 import lombok.extern.slf4j.Slf4j;
 
@@ -29,9 +30,11 @@ public class WallboxStatusResource {
     @Path("/status")
     public WallboxStatus getStatus() {
         log.debug("REST: Getting wallbox status");
-        return WallboxStatus.builder()
-                .charging(goEchargerAdapter.isCharging())
-                .chargingPower(goEchargerAdapter.readCurrentChargingPower())
-                .build();
+        try {
+            return goEchargerAdapter.readStatus();
+        } catch (RuntimeException e) {
+            return goEchargerAdapter.getLastKnownStatus()
+                    .orElseThrow(ServiceUnavailableException::new);
+        }
     }
 }
