@@ -24,7 +24,6 @@ import org.eclipse.microprofile.faulttolerance.Timeout;
 public class GoEchargerAdapter {
 
     private final GoEchargerModbusClient modbusClient;
-    private final GoEchargerConfig config;
 
     private volatile WallboxStatus lastKnownStatus;
 
@@ -34,7 +33,6 @@ public class GoEchargerAdapter {
     }
 
     GoEchargerAdapter(GoEchargerConfig config, GoEchargerModbusClient modbusClient) {
-        this.config = config;
         this.modbusClient = modbusClient;
     }
 

@@ -12,11 +12,12 @@ import lombok.Getter;
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 public enum CarStatus {
 
-    UNKNOWN(0, "Unbekannt, Ladestation defekt"),
+    DEVICE_FAULT(0, "Unbekannt, Ladestation defekt"),
     READY(1, "Ladestation bereit, kein Fahrzeug"),
     CHARGING(2, "Fahrzeug wird geladen"),
     WAITING_FOR_VEHICLE(3, "Warte auf Fahrzeug"),
-    CHARGING_FINISHED(4, "Ladung beendet, Fahrzeug noch verbunden");
+    CHARGING_FINISHED(4, "Ladung beendet, Fahrzeug noch verbunden"),
+    UNKNOWN(-1, "Unbekannter Status");
 
     private final int code;
     private final String description;
