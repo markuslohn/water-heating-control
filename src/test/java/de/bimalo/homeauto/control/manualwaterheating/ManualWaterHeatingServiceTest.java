@@ -21,6 +21,7 @@ import de.bimalo.homeauto.boundary.viessman.VitodensAdapter;
 import de.bimalo.homeauto.control.heatingcontrol.HeatingControlConfig;
 import de.bimalo.homeauto.control.heatingcontrol.HeatingControlService;
 import de.bimalo.homeauto.entity.BatteryStatus;
+import de.bimalo.homeauto.entity.GasHeatingStatus;
 import de.bimalo.homeauto.entity.HeatingSource;
 import de.bimalo.homeauto.entity.Percentage;
 import de.bimalo.homeauto.entity.Power;
@@ -69,6 +70,7 @@ class ManualWaterHeatingServiceTest {
         lenient().when(config.gasHeatingShutoffTemperatureOffset()).thenReturn(5.0);
         lenient().when(heatingControlConfig.maxHeatingPower()).thenReturn(2900);
         lenient().when(heatingControlConfig.temperatureHysteresis()).thenReturn(10.0);
+        lenient().when(vitodensAdapter.readStatus()).thenReturn(gasHeatingStatus(false));
     }
 
     // ==================== Lifecycle ====================
@@ -102,7 +104,7 @@ class ManualWaterHeatingServiceTest {
 
     @Test
     void deactivate_stopsGasHeating_whenActive() {
-        when(vitodensAdapter.isHeatingActive()).thenReturn(true);
+        when(vitodensAdapter.readStatus()).thenReturn(gasHeatingStatus(true));
         service.activate();
 
         service.deactivate();
@@ -208,8 +210,7 @@ class ManualWaterHeatingServiceTest {
                 new HeatingRodStatus(Temperature.ofCelsius(40.0), Temperature.ofCelsius(60.0), Power.ZERO, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         // Battery already discharging at its 1500W max for house consumption alone
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus(70, -1500));
-        when(vitodensAdapter.readHotWaterCurrentTemperature()).thenReturn(Temperature.ofCelsius(40.0));
-        when(vitodensAdapter.readHotWaterTargetTemperature()).thenReturn(Temperature.ofCelsius(55.0));
+        when(vitodensAdapter.readStatus()).thenReturn(gasHeatingStatus(false, 40.0, 55.0));
 
         service.manageWaterHeating();
 
@@ -270,8 +271,7 @@ class ManualWaterHeatingServiceTest {
         // Cycle 2: SOC dropped 10 points to 75% - well above the 50% absolute floor, but
         // exactly at the configured 10-percentage-point session drop limit
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus(75, 0));
-        when(vitodensAdapter.readHotWaterCurrentTemperature()).thenReturn(Temperature.ofCelsius(40.0));
-        when(vitodensAdapter.readHotWaterTargetTemperature()).thenReturn(Temperature.ofCelsius(55.0));
+        when(vitodensAdapter.readStatus()).thenReturn(gasHeatingStatus(false, 40.0, 55.0));
         service.manageWaterHeating();
 
         verify(elwa2Adapter).adjustHeating(argThat(p -> p.getWatts() == 0));
@@ -302,8 +302,7 @@ class ManualWaterHeatingServiceTest {
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new HeatingRodStatus(Temperature.ofCelsius(50.0), Temperature.ofCelsius(60.0), Power.ZERO, Elwa2OperatingStatus.UNKNOWN, Instant.now())); // no battery trigger
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus(70, 0));
-        when(vitodensAdapter.readHotWaterCurrentTemperature()).thenReturn(Temperature.ofCelsius(30.0));
-        when(vitodensAdapter.readHotWaterTargetTemperature()).thenReturn(Temperature.ofCelsius(55.0));
+        when(vitodensAdapter.readStatus()).thenReturn(gasHeatingStatus(false, 30.0, 55.0));
 
         service.manageWaterHeating();
 
@@ -317,8 +316,7 @@ class ManualWaterHeatingServiceTest {
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new HeatingRodStatus(Temperature.ofCelsius(50.0), Temperature.ofCelsius(60.0), Power.ZERO, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus(70, 0));
-        when(vitodensAdapter.readHotWaterCurrentTemperature()).thenReturn(Temperature.ofCelsius(40.0)); // above 35°C
-        when(vitodensAdapter.readHotWaterTargetTemperature()).thenReturn(Temperature.ofCelsius(55.0));
+        when(vitodensAdapter.readStatus()).thenReturn(gasHeatingStatus(false, 40.0, 55.0)); // above 35°C
 
         service.manageWaterHeating();
 
@@ -332,9 +330,7 @@ class ManualWaterHeatingServiceTest {
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new HeatingRodStatus(Temperature.ofCelsius(50.0), Temperature.ofCelsius(60.0), Power.ZERO, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus(70, 0));
-        when(vitodensAdapter.readHotWaterCurrentTemperature()).thenReturn(Temperature.ofCelsius(55.0));
-        when(vitodensAdapter.readHotWaterTargetTemperature()).thenReturn(Temperature.ofCelsius(55.0));
-        when(vitodensAdapter.isHeatingActive()).thenReturn(true);
+        when(vitodensAdapter.readStatus()).thenReturn(gasHeatingStatus(true, 55.0, 55.0));
 
         service.manageWaterHeating();
 
@@ -349,15 +345,13 @@ class ManualWaterHeatingServiceTest {
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new HeatingRodStatus(Temperature.ofCelsius(50.0), Temperature.ofCelsius(60.0), Power.ZERO, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus(70, 0));
-        when(vitodensAdapter.readHotWaterTargetTemperature()).thenReturn(Temperature.ofCelsius(55.0));
 
         // Cycle 1: trigger gas fallback
-        when(vitodensAdapter.readHotWaterCurrentTemperature()).thenReturn(Temperature.ofCelsius(30.0));
+        when(vitodensAdapter.readStatus()).thenReturn(gasHeatingStatus(false, 30.0, 55.0));
         service.manageWaterHeating();
 
         // Cycle 2: temperature reached target(55) - offset(5) = 50, but not yet the actual target
-        when(vitodensAdapter.readHotWaterCurrentTemperature()).thenReturn(Temperature.ofCelsius(51.0));
-        when(vitodensAdapter.isHeatingActive()).thenReturn(true);
+        when(vitodensAdapter.readStatus()).thenReturn(gasHeatingStatus(true, 51.0, 55.0));
         service.manageWaterHeating();
 
         verify(vitodensAdapter, atLeastOnce()).deactivateHeating();
@@ -374,13 +368,12 @@ class ManualWaterHeatingServiceTest {
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new HeatingRodStatus(Temperature.ofCelsius(50.0), Temperature.ofCelsius(60.0), Power.ZERO, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus(70, 0));
-        when(vitodensAdapter.readHotWaterCurrentTemperature()).thenReturn(Temperature.ofCelsius(30.0));
-        when(vitodensAdapter.readHotWaterTargetTemperature()).thenReturn(Temperature.ofCelsius(55.0));
+        when(vitodensAdapter.readStatus()).thenReturn(gasHeatingStatus(false, 30.0, 55.0));
         service.manageWaterHeating();
 
         // Cycle 2: PV surplus becomes available
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus(70, 0, 500));
-        when(vitodensAdapter.isHeatingActive()).thenReturn(true);
+        when(vitodensAdapter.readStatus()).thenReturn(gasHeatingStatus(true));
         service.manageWaterHeating();
 
         verify(vitodensAdapter).deactivateHeating();
@@ -411,6 +404,19 @@ class ManualWaterHeatingServiceTest {
                 .batteryPower(Power.ofWatts(batteryWatts))
                 .gridPower(Power.ZERO)
                 .batteryStateOfCharge(Percentage.of(socPercent))
+                .build();
+    }
+
+    private GasHeatingStatus gasHeatingStatus(boolean active) {
+        return gasHeatingStatus(active, 50.0, 55.0);
+    }
+
+    private GasHeatingStatus gasHeatingStatus(boolean active, double currentTempCelsius, double targetTempCelsius) {
+        return GasHeatingStatus.builder()
+                .active(active)
+                .currentTemperature(Temperature.ofCelsius(currentTempCelsius))
+                .targetTemperature(Temperature.ofCelsius(targetTempCelsius))
+                .measuredAt(Instant.now())
                 .build();
     }
 }

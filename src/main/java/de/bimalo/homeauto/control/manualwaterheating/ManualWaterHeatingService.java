@@ -7,6 +7,7 @@ import de.bimalo.homeauto.boundary.viessman.VitodensAdapter;
 import de.bimalo.homeauto.control.heatingcontrol.HeatingControlConfig;
 import de.bimalo.homeauto.control.heatingcontrol.HeatingControlService;
 import de.bimalo.homeauto.entity.BatteryStatus;
+import de.bimalo.homeauto.entity.GasHeatingStatus;
 import de.bimalo.homeauto.entity.HeatingSource;
 import de.bimalo.homeauto.entity.ManualWaterHeatingStatus;
 import de.bimalo.homeauto.entity.Power;
@@ -92,7 +93,7 @@ public class ManualWaterHeatingService {
     public void deactivate() {
         if (active.compareAndSet(true, false)) {
             elwa2Adapter.adjustHeating(Power.ZERO);
-            if (vitodensAdapter.isHeatingActive()) {
+            if (vitodensAdapter.readStatus().active()) {
                 vitodensAdapter.deactivateHeating();
             }
             currentSource = HeatingSource.NONE;
@@ -136,7 +137,7 @@ public class ManualWaterHeatingService {
         }
 
         if (decision.power().isPositive()) {
-            if (vitodensAdapter.isHeatingActive()) {
+            if (vitodensAdapter.readStatus().active()) {
                 vitodensAdapter.deactivateHeating();
             }
             gasAssistActive.set(false);
@@ -241,8 +242,9 @@ public class ManualWaterHeatingService {
      */
     private boolean manageGasFallback() {
         boolean wasActive = gasAssistActive.get();
-        Temperature gasCurrentTemp = vitodensAdapter.readHotWaterCurrentTemperature();
-        Temperature gasTargetTemp = vitodensAdapter.readHotWaterTargetTemperature();
+        GasHeatingStatus gasStatus = vitodensAdapter.readStatus();
+        Temperature gasCurrentTemp = gasStatus.currentTemperature();
+        Temperature gasTargetTemp = gasStatus.targetTemperature();
         double shutoffTemp = gasTargetTemp.getCelsius() - config.gasHeatingShutoffTemperatureOffset();
 
         if (gasCurrentTemp.getCelsius() >= shutoffTemp) {
@@ -256,7 +258,7 @@ public class ManualWaterHeatingService {
             vitodensAdapter.activateHeating();
             currentSource = HeatingSource.GAS;
         } else {
-            if (vitodensAdapter.isHeatingActive()) {
+            if (gasStatus.active()) {
                 vitodensAdapter.deactivateHeating();
             }
             currentSource = HeatingSource.NONE;

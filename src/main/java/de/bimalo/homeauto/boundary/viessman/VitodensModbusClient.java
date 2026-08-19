@@ -27,8 +27,12 @@ public final class VitodensModbusClient extends AbstractModbusClient {
         return Double.valueOf(value * factor).intValue();
     }
 
-    private int convertToRawValue(double value, double factor) {
-        return Double.valueOf(value * factor).intValue();
+    private double scaleReadValue(int rawValue, double factor) {
+        return rawValue * factor;
+    }
+
+    private int scaleWriteValue(double value, double factor) {
+        return (int) Math.round(value * factor);
     }
 
     public boolean gatewayConnected() {
@@ -51,21 +55,21 @@ public final class VitodensModbusClient extends AbstractModbusClient {
 
     public ExternalRequestMode readExternalRequestStatus() {
         VitodensRegister register = VitodensRegister.EXTERNAL_REQUEST_STATUS;
-        int rawValue = convertToRawValue(this.readInputUnsignedInteger(register.getAddress()),
-                register.getReadFactor());
-        return ExternalRequestMode.fromValue(rawValue);
+        int rawValue = this.readInputUnsignedInteger(register.getAddress());
+        int value = (int) Math.round(scaleReadValue(rawValue, register.getReadFactor()));
+        return ExternalRequestMode.fromValue(value);
     }
 
     public Temperature readHotWaterTargetTemperature() {
         VitodensRegister register = VitodensRegister.HOT_WATER_TARGET_TEMPERATUR;
-        double rawValue = convertToRawValue(this.readInteger(register.getAddress()), register.getReadFactor());
-        return Temperature.ofCelsius(rawValue);
+        int rawValue = readInputInteger(register.getAddress());
+        return Temperature.ofCelsius(scaleReadValue(rawValue, register.getReadFactor()));
     }
 
     public void writeHotWaterTargetTemperature(Temperature temperature) {
         VitodensRegister register = VitodensRegister.HOT_WATER_TARGET_TEMPERATUR;
-        this.writeUnsignedInteger(register.getAddress(),
-                convertToRawValue(temperature.getCelsius(), register.getWriteFactor()));
+        writeUnsignedInteger(register.getAddress(),
+                scaleWriteValue(temperature.getCelsius(), register.getWriteFactor()));
     }
 
     public void writeHotWaterHeatingProgram(HotWaterProgram program) {

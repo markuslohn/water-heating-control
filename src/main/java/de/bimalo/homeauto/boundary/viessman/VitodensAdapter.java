@@ -1,17 +1,19 @@
 package de.bimalo.homeauto.boundary.viessman;
 
+import de.bimalo.homeauto.entity.GasHeatingStatus;
 import de.bimalo.homeauto.entity.Temperature;
-import de.bimalo.homeauto.entity.Volume;
 import io.quarkus.scheduler.Scheduled;
 import io.smallrye.faulttolerance.api.CircuitBreakerName;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+
+import java.time.Instant;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
-import org.eclipse.microprofile.faulttolerance.Fallback;
 import org.eclipse.microprofile.faulttolerance.Timeout;
 
 @Slf4j
@@ -21,16 +23,13 @@ public class VitodensAdapter {
     private final VitodensConfig config;
     private final VitodensModbusClient modbusClient;
 
-    // Cached values for fallback when circuit is open
-    private volatile Temperature lastKnownHotWaterCurrentTemperature = Temperature.ofCelsius(50.0);
-    private volatile Temperature lastKnownOutsideTemperature = Temperature.ofCelsius(10.0);
-    private volatile Temperature lastKnownHotWaterTargetTemperature = Temperature.ofCelsius(50.0);
-    private volatile Volume lastKnownHotWaterGasConsumptionToday = Volume.ZERO;
-    private volatile Volume lastKnownHotWaterGasConsumptionThisMonth = Volume.ZERO;
+    private volatile GasHeatingStatus lastKnownStatus;
 
-    // Tracks whether this application currently intends to drive hot water
-    // production via the external Modbus request (drives the keep-alive schedule).
-    private final AtomicBoolean active = new AtomicBoolean(false);
+    /**
+     * Describes the application's intention to keep external hot-water control
+     * active. This is not necessarily the actual state reported by the device.
+     */
+    private volatile boolean heatingRequested;
 
     @Inject
     public VitodensAdapter(VitodensConfig config) {
@@ -54,56 +53,56 @@ public class VitodensAdapter {
      * Disconnects from the heating system.
      */
     @PreDestroy
-    public void shutdown() {
-        modbusClient.shutdown();
+    public synchronized void shutdown() {
+        try {
+            if (heatingRequested) {
+                deactivateHeating();
+            }
+        } catch (RuntimeException ex) {
+            log.error(
+                    "Failed to deactivate Vitodens heating during shutdown",
+                    ex);
+        } finally {
+            modbusClient.shutdown();
+        }
     }
 
     @CircuitBreaker(requestVolumeThreshold = 4, failureRatio = 0.5, delay = 5000, successThreshold = 2)
-    @Timeout(value = 3000)
-    @Fallback(fallbackMethod = "readHotWaterCurrentTemperatureFallback")
-    @CircuitBreakerName("vitodens-hotwater-current-temperature")
-    public Temperature readHotWaterCurrentTemperature() {
-        Temperature result = modbusClient.readHotWaterCurrentTemperature();
-        lastKnownHotWaterCurrentTemperature = result; // Cache successful read
-        return result;
+    @CircuitBreakerName("vitodens-status")
+    @Timeout(5000)
+    public GasHeatingStatus readStatus() {
+        ExternalRequestMode externalRequest = modbusClient.readExternalRequestStatus();
+
+        HotWaterProgram program = modbusClient.readHotWaterHeatingProgramCurrentStatus();
+
+        Temperature currentTemperature = modbusClient.readHotWaterCurrentTemperature();
+
+        Temperature targetTemperature = modbusClient.readHotWaterTargetTemperature();
+
+        boolean active = externalRequest == ExternalRequestMode.MODBUS_CONNECTION
+                && program == HotWaterProgram.FLOW_TEMPERATURE_SETPOINT;
+
+        GasHeatingStatus status = GasHeatingStatus.builder().active(active).currentTemperature(currentTemperature)
+                .targetTemperature(targetTemperature).measuredAt(Instant.now()).build();
+
+        lastKnownStatus = status;
+        return status;
     }
 
-    private Temperature readHotWaterCurrentTemperatureFallback() {
-        log.warn("Circuit breaker open for hot water current temperature read, returning last known value: {}°C",
-                lastKnownHotWaterCurrentTemperature.getCelsius());
-        return lastKnownHotWaterCurrentTemperature;
+    public Optional<GasHeatingStatus> getLastKnownStatus() {
+        return Optional.ofNullable(lastKnownStatus);
     }
 
-    @CircuitBreaker(requestVolumeThreshold = 4, failureRatio = 0.5, delay = 5000, successThreshold = 2)
-    @Timeout(value = 3000)
-    @Fallback(fallbackMethod = "readOutsideTemperatureFallback")
-    @CircuitBreakerName("vitodens-outside-temperature")
-    public Temperature readOutsideTemperature() {
-        Temperature result = modbusClient.readOutsideTemperature();
-        lastKnownOutsideTemperature = result; // Cache successful read
-        return result;
-    }
-
-    private Temperature readOutsideTemperatureFallback() {
-        log.warn("Circuit breaker open for outside temperature read, returning last known value: {}°C",
-                lastKnownOutsideTemperature.getCelsius());
-        return lastKnownOutsideTemperature;
-    }
-
-    @CircuitBreaker(requestVolumeThreshold = 4, failureRatio = 0.5, delay = 5000, successThreshold = 2)
-    @Timeout(value = 3000)
-    @Fallback(fallbackMethod = "readHotWaterTargetTemperatureFallback")
-    @CircuitBreakerName("vitodens-hotwater-target-temperature")
-    public Temperature readHotWaterTargetTemperature() {
-        Temperature result = modbusClient.readHotWaterTargetTemperature();
-        lastKnownHotWaterTargetTemperature = result; // Cache successful read
-        return result;
-    }
-
-    private Temperature readHotWaterTargetTemperatureFallback() {
-        log.warn("Circuit breaker open for hot water target temperature read, returning last known value: {}°C",
-                lastKnownHotWaterTargetTemperature.getCelsius());
-        return lastKnownHotWaterTargetTemperature;
+    /**
+     * Returns whether this application intends to maintain the external
+     * hot-water request.
+     *
+     * <p>
+     * This is not the actual device state. Use {@link #readStatus()} to read
+     * the state reported by the Vitodens.
+     */
+    public boolean isHeatingRequested() {
+        return heatingRequested;
     }
 
     /**
@@ -112,11 +111,22 @@ public class VitodensAdapter {
      * setpoint. The external request is kept alive periodically until
      * {@link #deactivateHeating()} is called.
      */
-    public void activateHeating() {
-        continueHeating();
-        modbusClient.writeHotWaterHeatingProgram(HotWaterProgram.FLOW_TEMPERATURE_SETPOINT);
-        active.set(true);
-        log.info("Gas heating activated for hot water production");
+    public synchronized void activateHeating() {
+        if (heatingRequested) {
+            return;
+        }
+        try {
+            modbusClient.writeExternalRequest(ExternalRequestMode.MODBUS_CONNECTION);
+            modbusClient.writeHotWaterHeatingProgram(HotWaterProgram.FLOW_TEMPERATURE_SETPOINT);
+            heatingRequested = true;
+
+            log.info("Vitodens hot-water production activated via external request");
+        } catch (RuntimeException activationFailure) {
+            heatingRequested = false;
+
+            rollbackFailedActivation(activationFailure);
+            throw activationFailure;
+        }
     }
 
     /**
@@ -124,21 +134,29 @@ public class VitodensAdapter {
      * external Modbus request and returns the hot water program to its
      * internal setpoint.
      */
-    public void deactivateHeating() {
-        modbusClient.writeHotWaterHeatingProgram(HotWaterProgram.INTERNAL_SHOULD_VALUE);
-        modbusClient.writeExternalRequest(ExternalRequestMode.NO_CONNECTION);
-        active.set(false);
-        log.info("Gas heating deactivated");
-    }
+    public synchronized void deactivateHeating() {
+        heatingRequested = false;
 
-    /**
-     * Refreshes the external Modbus request. The Vitodens falls back to internal
-     * control if this register isn't refreshed periodically, so this must be
-     * called cyclically while heating is active.
-     */
-    public void continueHeating() {
-        modbusClient.writeExternalRequest(ExternalRequestMode.MODBUS_CONNECTION);
-        active.set(true);
+        RuntimeException failure = null;
+
+        try {
+            modbusClient.writeHotWaterHeatingProgram(HotWaterProgram.INTERNAL_SHOULD_VALUE);
+        } catch (RuntimeException ex) {
+            failure = ex;
+        }
+
+        try {
+            modbusClient.writeExternalRequest(ExternalRequestMode.NO_CONNECTION);
+        } catch (RuntimeException ex) {
+            failure = combineFailures(failure, ex);
+        }
+
+        if (failure != null) {
+            log.error("Failed to fully deactivate Vitodens hot-water production", failure);
+            throw failure;
+        }
+
+        log.info("Vitodens external hot-water request deactivated");
     }
 
     /**
@@ -146,67 +164,55 @@ public class VitodensAdapter {
      * independently of any control loop so callers only need to call
      * {@link #activateHeating()}/{@link #deactivateHeating()} once.
      */
-    @Scheduled(every = "{vitodens.keep-alive-interval}")
-    public void keepExternalRequestAlive() {
-        System.out.println("keep " + active.get());
-        if (!active.get()) {
+    @Scheduled(every = "{vitodens.keep-alive-interval}", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
+    public synchronized void keepExternalRequestAlive() {
+        if (!heatingRequested) {
             return;
         }
+
         try {
-            continueHeating();
-        } catch (Exception e) {
-            log.error("Failed to refresh external Modbus request for gas heating", e);
+            refreshExternalRequest();
+        } catch (RuntimeException ex) {
+            log.error("Failed to refresh external Modbus request for gas heating", ex);
         }
+    }
+
+    private void refreshExternalRequest() {
+        modbusClient.writeExternalRequest(
+                ExternalRequestMode.MODBUS_CONNECTION);
     }
 
     /**
-     * Returns whether hot water is currently being produced via the gas heating,
-     * based on the actual device state rather than just this application's intent.
+     * Attempts to restore the device to internal control after a partially
+     * successful activation.
      */
-    @CircuitBreaker(requestVolumeThreshold = 4, failureRatio = 0.5, delay = 5000, successThreshold = 2)
-    @Timeout(value = 3000)
-    @Fallback(fallbackMethod = "isHeatingActiveFallback")
-    @CircuitBreakerName("vitodens-external-request-status")
-    public boolean isHeatingActive() {
-        return modbusClient.readExternalRequestStatus() == ExternalRequestMode.MODBUS_CONNECTION
-                && modbusClient.readHotWaterHeatingProgramCurrentStatus() == HotWaterProgram.FLOW_TEMPERATURE_SETPOINT;
+    private void rollbackFailedActivation(RuntimeException activationFailure) {
+
+        try {
+            modbusClient.writeHotWaterHeatingProgram(HotWaterProgram.INTERNAL_SHOULD_VALUE);
+        } catch (RuntimeException rollbackFailure) {
+            activationFailure.addSuppressed(rollbackFailure);
+        }
+
+        try {
+            modbusClient.writeExternalRequest(ExternalRequestMode.NO_CONNECTION);
+        } catch (RuntimeException rollbackFailure) {
+            activationFailure.addSuppressed(rollbackFailure);
+        }
+
+        log.error("Failed to activate Vitodens hot-water production; "
+                + "best-effort rollback was executed", activationFailure);
     }
 
-    private boolean isHeatingActiveFallback() {
-        log.warn("Circuit breaker open for external request status read, returning last known intent: {}",
-                active.get());
-        return active.get();
-    }
+    private RuntimeException combineFailures(
+            RuntimeException first,
+            RuntimeException additional) {
 
-    @CircuitBreaker(requestVolumeThreshold = 4, failureRatio = 0.5, delay = 5000, successThreshold = 2)
-    @Timeout(value = 3000)
-    @Fallback(fallbackMethod = "readHotWaterGasConsumptionTodayFallback")
-    @CircuitBreakerName("vitodens-gas-consumption-today")
-    public Volume readHotWaterGasConsumptionToday() {
-        Volume result = modbusClient.readHotWaterGasConsumptionToday();
-        lastKnownHotWaterGasConsumptionToday = result; // Cache successful read
-        return result;
-    }
+        if (first == null) {
+            return additional;
+        }
 
-    private Volume readHotWaterGasConsumptionTodayFallback() {
-        log.warn("Circuit breaker open for gas consumption (today) read, returning last known value: {}",
-                lastKnownHotWaterGasConsumptionToday);
-        return lastKnownHotWaterGasConsumptionToday;
-    }
-
-    @CircuitBreaker(requestVolumeThreshold = 4, failureRatio = 0.5, delay = 5000, successThreshold = 2)
-    @Timeout(value = 3000)
-    @Fallback(fallbackMethod = "readHotWaterGasConsumptionThisMonthFallback")
-    @CircuitBreakerName("vitodens-gas-consumption-month")
-    public Volume readHotWaterGasConsumptionThisMonth() {
-        Volume result = modbusClient.readHotWaterGasConsumptionThisMonth();
-        lastKnownHotWaterGasConsumptionThisMonth = result; // Cache successful read
-        return result;
-    }
-
-    private Volume readHotWaterGasConsumptionThisMonthFallback() {
-        log.warn("Circuit breaker open for gas consumption (this month) read, returning last known value: {}",
-                lastKnownHotWaterGasConsumptionThisMonth);
-        return lastKnownHotWaterGasConsumptionThisMonth;
+        first.addSuppressed(additional);
+        return first;
     }
 }

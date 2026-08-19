@@ -1,16 +1,21 @@
 package de.bimalo.homeauto.boundary.viessman;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.bimalo.homeauto.entity.GasHeatingStatus;
 import de.bimalo.homeauto.entity.Temperature;
-import de.bimalo.homeauto.entity.Volume;
+import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,45 +43,33 @@ class VitodensAdapterTest {
     }
 
     @Test
-    void readHotWaterCurrentTemperature_returnsTemperatureFromModbusClient() {
+    void readStatus_returnsActiveStatus_whenExternalRequestConnectedAndProgramIsFlowTemperatureSetpoint() {
+        when(modbusClient.readExternalRequestStatus()).thenReturn(ExternalRequestMode.MODBUS_CONNECTION);
+        when(modbusClient.readHotWaterHeatingProgramCurrentStatus())
+                .thenReturn(HotWaterProgram.FLOW_TEMPERATURE_SETPOINT);
         when(modbusClient.readHotWaterCurrentTemperature()).thenReturn(Temperature.ofCelsius(52.5));
-
-        assertEquals(Temperature.ofCelsius(52.5), service.readHotWaterCurrentTemperature());
-    }
-
-    @Test
-    void readOutsideTemperature_returnsTemperatureFromModbusClient() {
-        when(modbusClient.readOutsideTemperature()).thenReturn(Temperature.ofCelsius(8.3));
-
-        assertEquals(Temperature.ofCelsius(8.3), service.readOutsideTemperature());
-    }
-
-    @Test
-    void readHotWaterTargetTemperature_returnsTemperatureFromModbusClient() {
         when(modbusClient.readHotWaterTargetTemperature()).thenReturn(Temperature.ofCelsius(55.0));
 
-        assertEquals(Temperature.ofCelsius(55.0), service.readHotWaterTargetTemperature());
+        Instant before = Instant.now();
+        GasHeatingStatus status = service.readStatus();
+        Instant after = Instant.now();
+
+        assertTrue(status.active());
+        assertEquals(Temperature.ofCelsius(52.5), status.currentTemperature());
+        assertEquals(Temperature.ofCelsius(55.0), status.targetTemperature());
+        assertFalse(status.measuredAt().isBefore(before));
+        assertFalse(status.measuredAt().isAfter(after));
     }
 
     @Test
-    void readHotWaterGasConsumptionToday_returnsVolumeFromModbusClient() {
-        when(modbusClient.readHotWaterGasConsumptionToday()).thenReturn(Volume.ofCubicMeters(3.2));
+    void readStatus_returnsInactiveStatus_whenExternalRequestNotConnected() {
+        when(modbusClient.readExternalRequestStatus()).thenReturn(ExternalRequestMode.NO_CONNECTION);
+        when(modbusClient.readHotWaterCurrentTemperature()).thenReturn(Temperature.ofCelsius(45.0));
+        when(modbusClient.readHotWaterTargetTemperature()).thenReturn(Temperature.ofCelsius(55.0));
 
-        assertEquals(Volume.ofCubicMeters(3.2), service.readHotWaterGasConsumptionToday());
-    }
+        GasHeatingStatus status = service.readStatus();
 
-    @Test
-    void readHotWaterGasConsumptionThisMonth_returnsVolumeFromModbusClient() {
-        when(modbusClient.readHotWaterGasConsumptionThisMonth()).thenReturn(Volume.ofCubicMeters(41.7));
-
-        assertEquals(Volume.ofCubicMeters(41.7), service.readHotWaterGasConsumptionThisMonth());
-    }
-
-    @Test
-    void continueHeating_requestsModbusConnection() {
-        service.continueHeating();
-
-        verify(modbusClient).writeExternalRequest(ExternalRequestMode.MODBUS_CONNECTION);
+        assertFalse(status.active());
     }
 
     @Test
@@ -85,30 +78,77 @@ class VitodensAdapterTest {
 
         verify(modbusClient).writeExternalRequest(ExternalRequestMode.MODBUS_CONNECTION);
         verify(modbusClient).writeHotWaterHeatingProgram(HotWaterProgram.FLOW_TEMPERATURE_SETPOINT);
+        assertTrue(service.isHeatingRequested());
+    }
+
+    @Test
+    void activateHeating_doesNothing_whenAlreadyActive() {
+        service.activateHeating();
+
+        service.activateHeating();
+
+        verify(modbusClient, times(1)).writeExternalRequest(ExternalRequestMode.MODBUS_CONNECTION);
+        verify(modbusClient, times(1)).writeHotWaterHeatingProgram(HotWaterProgram.FLOW_TEMPERATURE_SETPOINT);
+    }
+
+    @Test
+    void activateHeating_rollsBackAndRethrows_whenProgramWriteFails() {
+        RuntimeException programFailure = new RuntimeException("program write failed");
+        doThrow(programFailure).when(modbusClient).writeHotWaterHeatingProgram(HotWaterProgram.FLOW_TEMPERATURE_SETPOINT);
+
+        RuntimeException thrown = assertThrows(RuntimeException.class, () -> service.activateHeating());
+
+        assertSame(programFailure, thrown);
+        verify(modbusClient).writeHotWaterHeatingProgram(HotWaterProgram.INTERNAL_SHOULD_VALUE);
+        verify(modbusClient).writeExternalRequest(ExternalRequestMode.NO_CONNECTION);
+        assertFalse(service.isHeatingRequested());
     }
 
     @Test
     void deactivateHeating_releasesModbusConnectionAndInternalShouldValueProgram() {
+        service.activateHeating();
+
         service.deactivateHeating();
 
         verify(modbusClient).writeHotWaterHeatingProgram(HotWaterProgram.INTERNAL_SHOULD_VALUE);
         verify(modbusClient).writeExternalRequest(ExternalRequestMode.NO_CONNECTION);
+        assertFalse(service.isHeatingRequested());
     }
 
     @Test
-    void isHeatingActive_returnsTrueWhenDeviceReportsModbusConnection() {
-        when(modbusClient.readExternalRequestStatus()).thenReturn(ExternalRequestMode.MODBUS_CONNECTION);
-        when(modbusClient.readHotWaterHeatingProgramCurrentStatus())
-                .thenReturn(HotWaterProgram.FLOW_TEMPERATURE_SETPOINT);
+    void deactivateHeating_stillWritesExternalRequest_whenProgramWriteFails() {
+        doThrow(new RuntimeException("program write failed")).when(modbusClient)
+                .writeHotWaterHeatingProgram(HotWaterProgram.INTERNAL_SHOULD_VALUE);
 
-        assertTrue(service.isHeatingActive());
+        assertThrows(RuntimeException.class, () -> service.deactivateHeating());
+
+        verify(modbusClient).writeExternalRequest(ExternalRequestMode.NO_CONNECTION);
     }
 
     @Test
-    void isHeatingActive_returnsFalseWhenDeviceReportsNoConnection() {
-        when(modbusClient.readExternalRequestStatus()).thenReturn(ExternalRequestMode.NO_CONNECTION);
+    void deactivateHeating_throwsCombinedFailure_whenBothWritesFail() {
+        RuntimeException programFailure = new RuntimeException("program write failed");
+        RuntimeException requestFailure = new RuntimeException("request write failed");
+        doThrow(programFailure).when(modbusClient).writeHotWaterHeatingProgram(HotWaterProgram.INTERNAL_SHOULD_VALUE);
+        doThrow(requestFailure).when(modbusClient).writeExternalRequest(ExternalRequestMode.NO_CONNECTION);
 
-        assertFalse(service.isHeatingActive());
+        RuntimeException thrown = assertThrows(RuntimeException.class, () -> service.deactivateHeating());
+
+        assertSame(programFailure, thrown);
+        assertEquals(1, thrown.getSuppressed().length);
+        assertSame(requestFailure, thrown.getSuppressed()[0]);
+    }
+
+    @Test
+    void isHeatingRequested_returnsFalse_initially() {
+        assertFalse(service.isHeatingRequested());
+    }
+
+    @Test
+    void isHeatingRequested_returnsTrue_afterActivation() {
+        service.activateHeating();
+
+        assertTrue(service.isHeatingRequested());
     }
 
     @Test
@@ -125,5 +165,35 @@ class VitodensAdapterTest {
         service.keepExternalRequestAlive();
 
         verify(modbusClient, times(2)).writeExternalRequest(ExternalRequestMode.MODBUS_CONNECTION);
+    }
+
+    @Test
+    void shutdown_doesNotDeactivate_whenNotRequested() {
+        service.shutdown();
+
+        verify(modbusClient, never()).writeHotWaterHeatingProgram(any());
+        verify(modbusClient).shutdown();
+    }
+
+    @Test
+    void shutdown_deactivatesHeating_whenRequested() {
+        service.activateHeating();
+
+        service.shutdown();
+
+        verify(modbusClient).writeHotWaterHeatingProgram(HotWaterProgram.INTERNAL_SHOULD_VALUE);
+        verify(modbusClient).writeExternalRequest(ExternalRequestMode.NO_CONNECTION);
+        verify(modbusClient).shutdown();
+    }
+
+    @Test
+    void shutdown_stillShutsDownModbusClient_whenDeactivationFails() {
+        service.activateHeating();
+        doThrow(new RuntimeException("deactivation failed")).when(modbusClient)
+                .writeHotWaterHeatingProgram(HotWaterProgram.INTERNAL_SHOULD_VALUE);
+
+        assertDoesNotThrow(() -> service.shutdown());
+
+        verify(modbusClient).shutdown();
     }
 }

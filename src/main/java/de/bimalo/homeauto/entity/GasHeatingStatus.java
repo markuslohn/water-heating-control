@@ -1,22 +1,22 @@
 package de.bimalo.homeauto.entity;
 
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import lombok.Builder;
-import lombok.Getter;
 
 /**
  * Data class for the gas heating status.
  */
-@Getter
 @Builder
-public final class GasHeatingStatus {
+public record GasHeatingStatus(
+                boolean active,
+                Temperature currentTemperature,
+                Temperature targetTemperature,
+                Instant measuredAt) {
 
-    private final boolean active;
-    private final Temperature currentTemperature;
-    private final Temperature targetTemperature;
-
-    @Override
-    public String toString() {
-        return String.format("GasHeatingStatus[active=%s, currentTemp=%s, targetTemp=%s]",
-                active, currentTemperature, targetTemperature);
-    }
+        public boolean isOlderThan(Duration maximumAge, Clock clock) {
+                return !measuredAt.plus(maximumAge)
+                                .isAfter(clock.instant());
+        }
 }

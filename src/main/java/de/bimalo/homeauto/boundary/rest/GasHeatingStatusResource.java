@@ -6,6 +6,7 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.ServiceUnavailableException;
 import jakarta.ws.rs.core.MediaType;
 import lombok.extern.slf4j.Slf4j;
 
@@ -29,10 +30,10 @@ public class GasHeatingStatusResource {
     @Path("/status")
     public GasHeatingStatus getStatus() {
         log.debug("REST: Getting gas heating status");
-        return GasHeatingStatus.builder()
-                .active(vitodensAdapter.isHeatingActive())
-                .currentTemperature(vitodensAdapter.readHotWaterCurrentTemperature())
-                .targetTemperature(vitodensAdapter.readHotWaterTargetTemperature())
-                .build();
+        try {
+            return vitodensAdapter.readStatus();
+        } catch (RuntimeException ex) {
+            return vitodensAdapter.getLastKnownStatus().orElseThrow(ServiceUnavailableException::new);
+        }
     }
 }

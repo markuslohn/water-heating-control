@@ -12,6 +12,7 @@ import de.bimalo.homeauto.entity.HeatingRodStatus;
 import de.bimalo.homeauto.boundary.elwa2.Elwa2OperatingStatus;
 import de.bimalo.homeauto.boundary.temperatureprotocol.TemperatureProtocolFileWriter;
 import de.bimalo.homeauto.boundary.viessman.VitodensAdapter;
+import de.bimalo.homeauto.entity.GasHeatingStatus;
 import de.bimalo.homeauto.entity.Power;
 import de.bimalo.homeauto.entity.Temperature;
 import de.bimalo.homeauto.entity.TemperatureLogEntry;
@@ -56,7 +57,13 @@ class TemperatureProtocolServiceTest {
         when(config.enabled()).thenReturn(true);
         when(elwa2Adapter.readMeasurements()).thenReturn(
                 new HeatingRodStatus(Temperature.ofCelsius(62.5), Temperature.ofCelsius(60.0), Power.ZERO, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
-        when(vitodensAdapter.readHotWaterCurrentTemperature()).thenReturn(Temperature.ofCelsius(58.0));
+        when(vitodensAdapter.readStatus()).thenReturn(
+                GasHeatingStatus.builder()
+                        .active(false)
+                        .currentTemperature(Temperature.ofCelsius(58.0))
+                        .targetTemperature(Temperature.ofCelsius(55.0))
+                        .measuredAt(Instant.now())
+                        .build());
 
         service.recordTemperatures();
 
