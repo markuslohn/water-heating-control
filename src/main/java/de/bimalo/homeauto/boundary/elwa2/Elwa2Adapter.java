@@ -1,6 +1,7 @@
 package de.bimalo.homeauto.boundary.elwa2;
 
 import de.bimalo.homeauto.boundary.modbus.ModbusClientException;
+import de.bimalo.homeauto.entity.HeatingRodStatus;
 import de.bimalo.homeauto.entity.Power;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.annotation.PostConstruct;
@@ -28,7 +29,7 @@ public class Elwa2Adapter {
     private final Elwa2ModbusClient modbusClient;
     private Elwa2Config config;
 
-    private volatile Elwa2Measurements lastKnownMeasurements;
+    private volatile HeatingRodStatus lastKnownMeasurements;
 
     private volatile Duration powerCommandTimeout;
 
@@ -60,8 +61,8 @@ public class Elwa2Adapter {
 
     @CircuitBreaker(requestVolumeThreshold = 4, failureRatio = 0.5, delay = 5000, successThreshold = 2)
     @Timeout(6000)
-    public Elwa2Measurements readMeasurements() {
-        Elwa2Measurements measurements = new Elwa2Measurements(
+    public HeatingRodStatus readMeasurements() {
+        HeatingRodStatus measurements = new HeatingRodStatus(
                 modbusClient.readTemperature1(),
                 modbusClient.readTargetTemperature(),
                 modbusClient.readPower(),
@@ -72,7 +73,7 @@ public class Elwa2Adapter {
         return measurements;
     }
 
-    public Optional<Elwa2Measurements> getLastKnownMeasurements() {
+    public Optional<HeatingRodStatus> getLastKnownMeasurements() {
         return Optional.ofNullable(lastKnownMeasurements);
     }
 

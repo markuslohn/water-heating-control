@@ -61,9 +61,9 @@ public final class Elwa2ModbusClient extends AbstractModbusClient {
         return Temperature.ofCelsius(rawValue * register.getScaleFactor());
     }
 
-    public Elwa2Status readStatus() {
+    public Elwa2OperatingStatus readStatus() {
         int rawValue = this.readUnsignedInteger(Elwa2Register.STATUS.getAddress());
-        return Elwa2Status.fromValue(rawValue);
+        return Elwa2OperatingStatus.fromValue(rawValue);
     }
 
     public Power readPower() {

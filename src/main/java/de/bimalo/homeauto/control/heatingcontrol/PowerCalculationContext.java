@@ -19,10 +19,10 @@ public class PowerCalculationContext {
     private final Percentage batterySoc;
 
     public PowerCalculationContext(BatteryStatus batteryStatus, Power currentHeatingPower) {
-        this.productionPower = batteryStatus.getProductionPower();
-        this.houseConsumptionPower = batteryStatus.getConsumptionPower();
-        this.batteryPower = batteryStatus.getBatteryPower();
-        this.batterySoc = batteryStatus.getBatteryStateOfCharge();
+        this.productionPower = batteryStatus.productionPower();
+        this.houseConsumptionPower = batteryStatus.consumptionPower();
+        this.batteryPower = batteryStatus.batteryPower();
+        this.batterySoc = batteryStatus.batteryStateOfCharge();
         this.currentHeatingPower = currentHeatingPower;
     }
 

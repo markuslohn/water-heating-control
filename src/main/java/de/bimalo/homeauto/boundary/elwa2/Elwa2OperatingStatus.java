@@ -8,7 +8,7 @@ import lombok.RequiredArgsConstructor;
  */
 @Getter
 @RequiredArgsConstructor
-public enum Elwa2Status {
+public enum Elwa2OperatingStatus {
     NO_CONTROL(1, "No control"),
     HEAT(2, "Heat"),
     STANDBY(3, "Standby"),
@@ -29,14 +29,14 @@ public enum Elwa2Status {
     private final String description;
 
     /**
-     * Konvertiert einen Rohwert in einen Elwa2Status.
+     * Konvertiert einen Rohwert in einen Elwa2OperatingStatus.
      *
      * @param value der Rohwert aus dem Modbus-Register
      * @return den entsprechenden Status, oder UNKNOWN wenn der Wert nicht definiert
      *         ist
      */
-    public static Elwa2Status fromValue(int value) {
-        for (Elwa2Status status : values()) {
+    public static Elwa2OperatingStatus fromValue(int value) {
+        for (Elwa2OperatingStatus status : values()) {
             if (status.value == value) {
                 return status;
             }

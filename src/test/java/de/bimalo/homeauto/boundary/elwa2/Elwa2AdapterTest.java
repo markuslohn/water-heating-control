@@ -11,6 +11,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.bimalo.homeauto.boundary.modbus.ModbusClientException;
+import de.bimalo.homeauto.entity.HeatingRodStatus;
 import de.bimalo.homeauto.entity.Power;
 import de.bimalo.homeauto.entity.Temperature;
 import java.time.Duration;
@@ -51,7 +52,7 @@ class Elwa2AdapterTest {
         when(modbusClient.readPower()).thenReturn(Power.ofWatts(1500));
 
         Instant before = Instant.now();
-        Elwa2Measurements measurements = service.readMeasurements();
+        HeatingRodStatus measurements = service.readMeasurements();
         Instant after = Instant.now();
 
         assertEquals(Temperature.ofCelsius(45.2), measurements.currentTemperature());
@@ -67,7 +68,7 @@ class Elwa2AdapterTest {
         when(modbusClient.readTargetTemperature()).thenReturn(Temperature.ofCelsius(60.0));
         when(modbusClient.readPower()).thenReturn(Power.ofWatts(1500));
 
-        Elwa2Measurements measurements = service.readMeasurements();
+        HeatingRodStatus measurements = service.readMeasurements();
 
         assertEquals(Optional.of(measurements), service.getLastKnownMeasurements());
     }

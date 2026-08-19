@@ -12,8 +12,8 @@ import static org.mockito.Mockito.when;
 
 import de.bimalo.homeauto.boundary.e3dc.E3dcAdapter;
 import de.bimalo.homeauto.boundary.elwa2.Elwa2Adapter;
-import de.bimalo.homeauto.boundary.elwa2.Elwa2Measurements;
-import de.bimalo.homeauto.boundary.elwa2.Elwa2Status;
+import de.bimalo.homeauto.entity.HeatingRodStatus;
+import de.bimalo.homeauto.boundary.elwa2.Elwa2OperatingStatus;
 import de.bimalo.homeauto.boundary.modbus.ModbusReadException;
 import de.bimalo.homeauto.entity.BatteryStatus;
 import de.bimalo.homeauto.entity.Percentage;
@@ -83,7 +83,7 @@ class HeatingControlServiceTest {
         Power currentHeatingPower = Power.ofWatts(500);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(currentTemp, targetTemp, currentHeatingPower, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
 
         // When
         heatingControlService.controlHeatingSummer();
@@ -100,7 +100,7 @@ class HeatingControlServiceTest {
         Power currentHeatingPower = Power.ofWatts(0); // Already stopped
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(currentTemp, targetTemp, currentHeatingPower, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
 
         // When
         heatingControlService.controlHeatingSummer();
@@ -122,7 +122,7 @@ class HeatingControlServiceTest {
         BatteryStatus batteryStatus = createBatteryStatus(70, 250, 200, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(currentTemp, targetTemp, currentHeatingPower, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
 
         // When
@@ -147,7 +147,7 @@ class HeatingControlServiceTest {
         BatteryStatus batteryStatus = createBatteryStatus(70, 100, 300, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(currentTemp, targetTemp, currentHeatingPower, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
 
         // When
@@ -171,7 +171,7 @@ class HeatingControlServiceTest {
         BatteryStatus batteryStatus = createBatteryStatus(70, 1900, 200, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(currentTemp, targetTemp, currentHeatingPower, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
 
         // When
@@ -193,7 +193,7 @@ class HeatingControlServiceTest {
         BatteryStatus batteryStatus = createBatteryStatus(70, 3700, 200, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(currentTemp, targetTemp, currentHeatingPower, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
 
         // When
@@ -214,7 +214,7 @@ class HeatingControlServiceTest {
         BatteryStatus batteryStatus = createBatteryStatus(70, 2900, 200, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(currentTemp, targetTemp, currentHeatingPower, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
 
         // When
@@ -235,7 +235,7 @@ class HeatingControlServiceTest {
         BatteryStatus batteryStatus = createBatteryStatus(70, 1200, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(currentTemp, targetTemp, currentHeatingPower, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
 
         // When
@@ -270,7 +270,7 @@ class HeatingControlServiceTest {
         BatteryStatus batteryStatus = createBatteryStatus(70, 100, 50, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(currentTemp, targetTemp, currentHeatingPower, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
 
         // When
@@ -291,7 +291,7 @@ class HeatingControlServiceTest {
         BatteryStatus batteryStatus = createBatteryStatus(70, 99, 50, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(currentTemp, targetTemp, currentHeatingPower, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
 
         // When
@@ -319,7 +319,7 @@ class HeatingControlServiceTest {
                 .build();
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(currentTemp, targetTemp, currentHeatingPower, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
 
         // When
@@ -345,7 +345,7 @@ class HeatingControlServiceTest {
         BatteryStatus batteryStatus = createBatteryStatus(50, 2000, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(currentTemp, targetTemp, currentHeatingPower, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
         when(config.batteryPriorityEnabled()).thenReturn(true);
         when(config.batteryPriorityThreshold()).thenReturn(60);
@@ -369,7 +369,7 @@ class HeatingControlServiceTest {
         BatteryStatus batteryStatus = createBatteryStatus(70, 2000, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(currentTemp, targetTemp, currentHeatingPower, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
         when(config.batteryPriorityEnabled()).thenReturn(true);
         when(config.batteryPriorityThreshold()).thenReturn(60);
@@ -392,7 +392,7 @@ class HeatingControlServiceTest {
         BatteryStatus batteryStatus = createBatteryStatus(50, 2000, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(currentTemp, targetTemp, currentHeatingPower, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
         when(config.batteryPriorityEnabled()).thenReturn(false); // Disabled in config
 
@@ -415,7 +415,7 @@ class HeatingControlServiceTest {
         BatteryStatus batteryStatus = createBatteryStatus(50, 800, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(currentTemp, targetTemp, currentHeatingPower, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
         when(config.batteryPriorityEnabled()).thenReturn(true);
         when(config.batteryPriorityThreshold()).thenReturn(60);
@@ -440,7 +440,7 @@ class HeatingControlServiceTest {
         BatteryStatus batteryStatus = createBatteryStatus(45, 2000, 500, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(currentTemp, targetTemp, currentHeatingPower, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
         when(config.batteryPriorityEnabled()).thenReturn(true);
         when(config.batteryPriorityThreshold()).thenReturn(60);
@@ -464,7 +464,7 @@ class HeatingControlServiceTest {
         BatteryStatus batteryStatus = createBatteryStatus(60, 2000, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(currentTemp, targetTemp, currentHeatingPower, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
         when(config.batteryPriorityEnabled()).thenReturn(true);
         when(config.batteryPriorityThreshold()).thenReturn(60);
@@ -487,7 +487,7 @@ class HeatingControlServiceTest {
         BatteryStatus batteryStatus = createBatteryStatus(59, 2000, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(currentTemp, targetTemp, currentHeatingPower, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
         when(config.batteryPriorityEnabled()).thenReturn(true);
         when(config.batteryPriorityThreshold()).thenReturn(60);
@@ -512,7 +512,7 @@ class HeatingControlServiceTest {
         BatteryStatus batteryStatus = createBatteryStatus(50, 5000, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(currentTemp, targetTemp, currentHeatingPower, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
         when(config.batteryPriorityEnabled()).thenReturn(true);
         when(config.batteryPriorityThreshold()).thenReturn(60);
@@ -538,7 +538,7 @@ class HeatingControlServiceTest {
         BatteryStatus batteryStatus = createBatteryStatus(50, 2000, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(currentTemp, targetTemp, currentHeatingPower, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
         when(config.batteryPriorityEnabled()).thenReturn(true);
         // batteryPriorityThreshold and batteryReservedPower not mocked - not used when
@@ -563,7 +563,7 @@ class HeatingControlServiceTest {
         BatteryStatus batteryStatus = createBatteryStatus(50, 2000, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(currentTemp, targetTemp, currentHeatingPower, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
         when(config.batteryPriorityEnabled()).thenReturn(true);
         when(config.batteryPriorityThreshold()).thenReturn(60);
@@ -639,7 +639,7 @@ class HeatingControlServiceTest {
         Power currentHeatingPower = Power.ofWatts(500);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(currentTemp, targetTemp, currentHeatingPower, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(config.temperatureHysteresis()).thenReturn(10.0);
 
         // When
@@ -655,7 +655,7 @@ class HeatingControlServiceTest {
         Temperature targetReachedTemp = Temperature.ofCelsius(70.0);
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(targetReachedTemp, targetTemp, Power.ofWatts(500), Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(targetReachedTemp, targetTemp, Power.ofWatts(500), Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(config.temperatureHysteresis()).thenReturn(10.0);
 
         heatingControlService.controlHeatingSummer(); // Enter cooling mode
@@ -664,7 +664,7 @@ class HeatingControlServiceTest {
         Temperature coolingTemp = Temperature.ofCelsius(60.0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(coolingTemp, targetTemp, Power.ofWatts(500), Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(coolingTemp, targetTemp, Power.ofWatts(500), Elwa2OperatingStatus.UNKNOWN, Instant.now()));
 
         // When
         heatingControlService.controlHeatingSummer();
@@ -680,7 +680,7 @@ class HeatingControlServiceTest {
         Temperature targetReachedTemp = Temperature.ofCelsius(70.0);
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(targetReachedTemp, targetTemp, Power.ofWatts(500), Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(targetReachedTemp, targetTemp, Power.ofWatts(500), Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(config.temperatureHysteresis()).thenReturn(10.0);
 
         heatingControlService.controlHeatingSummer(); // Enter cooling mode
@@ -691,7 +691,7 @@ class HeatingControlServiceTest {
         BatteryStatus batteryStatus = createBatteryStatus(70, 2000, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(restartTemp, targetTemp, Power.ofWatts(0), Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(restartTemp, targetTemp, Power.ofWatts(0), Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
 
         // When
@@ -711,7 +711,7 @@ class HeatingControlServiceTest {
         BatteryStatus batteryStatus = createBatteryStatus(70, 1500, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(currentTemp, targetTemp, currentHeatingPower, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
         when(config.temperatureHysteresis()).thenReturn(10.0);
 
@@ -728,7 +728,7 @@ class HeatingControlServiceTest {
         Temperature targetReachedTemp = Temperature.ofCelsius(70.0);
         Temperature targetTemp = Temperature.ofCelsius(68.0);
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(targetReachedTemp, targetTemp, Power.ofWatts(500), Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(targetReachedTemp, targetTemp, Power.ofWatts(500), Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(config.temperatureHysteresis()).thenReturn(5.0); // 5°C hysteresis
 
         heatingControlService.controlHeatingSummer(); // Enter cooling mode
@@ -739,7 +739,7 @@ class HeatingControlServiceTest {
         BatteryStatus batteryStatus = createBatteryStatus(70, 2000, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(stillCoolingTemp, targetTemp, Power.ofWatts(0), Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(stillCoolingTemp, targetTemp, Power.ofWatts(0), Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
 
         // When
@@ -751,7 +751,7 @@ class HeatingControlServiceTest {
         // Now temperature drops to 62°C (below restart threshold of 63°C)
         Temperature restartTemp = Temperature.ofCelsius(62.0);
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(restartTemp, targetTemp, Power.ofWatts(0), Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(restartTemp, targetTemp, Power.ofWatts(0), Elwa2OperatingStatus.UNKNOWN, Instant.now()));
 
         // When
         heatingControlService.controlHeatingSummer();
@@ -770,7 +770,7 @@ class HeatingControlServiceTest {
         Power currentHeatingPower = Power.ofWatts(500);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(currentTemp, targetTemp, currentHeatingPower, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         // Note: Battery mocks not needed - manual mode returns early before surplus check
 
         // When: Manual mode is activated
@@ -790,7 +790,7 @@ class HeatingControlServiceTest {
         Power currentHeatingPower = Power.ofWatts(1000);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(currentTemp, targetTemp, currentHeatingPower, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
 
         // When: Manual mode is active and control runs
         heatingControlService.activateManualMode();
@@ -813,7 +813,7 @@ class HeatingControlServiceTest {
         BatteryStatus batteryStatus = createBatteryStatus(70, 1500, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(currentTemp, targetTemp, currentHeatingPower, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
 
         // When: Manual mode is activated and then deactivated
@@ -835,7 +835,7 @@ class HeatingControlServiceTest {
         BatteryStatus batteryStatus = createBatteryStatus(70, 1000, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(currentTemp, targetTemp, currentHeatingPower, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
 
         // When: Control runs without manual mode
@@ -854,7 +854,7 @@ class HeatingControlServiceTest {
         Power currentHeatingPower = Power.ofWatts(1000);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(currentTemp, targetTemp, currentHeatingPower, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
 
         // When: Manual mode is active and control runs
         heatingControlService.activateManualMode();
@@ -948,7 +948,7 @@ class HeatingControlServiceTest {
         BatteryStatus batteryStatus = createBatteryStatus(70, 2000, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(currentTemp, targetTemp, currentHeatingPower, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
         when(config.solarPowerReductionPercent()).thenReturn(5);
 
@@ -968,7 +968,7 @@ class HeatingControlServiceTest {
         BatteryStatus batteryStatus = createBatteryStatus(70, 2000, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(currentTemp, targetTemp, currentHeatingPower, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
         when(config.solarPowerReductionPercent()).thenReturn(0);
 
@@ -988,7 +988,7 @@ class HeatingControlServiceTest {
         BatteryStatus batteryStatus = createBatteryStatus(70, 2000, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(currentTemp, targetTemp, currentHeatingPower, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
         when(config.solarPowerReductionPercent()).thenReturn(10);
 
@@ -1009,7 +1009,7 @@ class HeatingControlServiceTest {
         BatteryStatus batteryStatus = createBatteryStatus(70, 4000, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(currentTemp, targetTemp, currentHeatingPower, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
         when(config.solarPowerReductionPercent()).thenReturn(5);
 
@@ -1029,7 +1029,7 @@ class HeatingControlServiceTest {
         BatteryStatus batteryStatus = createBatteryStatus(70, 150, 0, 0);
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(currentTemp, targetTemp, currentHeatingPower, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
         when(config.solarPowerReductionPercent()).thenReturn(40); // 150 - 40% = 90W < 100W min
 
@@ -1050,7 +1050,7 @@ class HeatingControlServiceTest {
         BatteryStatus batteryStatus = createBatteryStatus(50, 3000, 0, 0); // SOC below threshold
 
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(currentTemp, targetTemp, currentHeatingPower, Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(currentTemp, targetTemp, currentHeatingPower, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(e3dcAdapter.readStatus()).thenReturn(batteryStatus);
         when(config.batteryPriorityEnabled()).thenReturn(true);
         when(config.batteryPriorityThreshold()).thenReturn(60);

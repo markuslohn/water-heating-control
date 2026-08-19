@@ -2,7 +2,7 @@ package de.bimalo.homeauto.control.manualwaterheating;
 
 import de.bimalo.homeauto.boundary.e3dc.E3dcAdapter;
 import de.bimalo.homeauto.boundary.elwa2.Elwa2Adapter;
-import de.bimalo.homeauto.boundary.elwa2.Elwa2Measurements;
+import de.bimalo.homeauto.entity.HeatingRodStatus;
 import de.bimalo.homeauto.boundary.viessman.VitodensAdapter;
 import de.bimalo.homeauto.control.heatingcontrol.HeatingControlConfig;
 import de.bimalo.homeauto.control.heatingcontrol.HeatingControlService;
@@ -121,7 +121,7 @@ public class ManualWaterHeatingService {
     }
 
     private void runCycle() {
-        Elwa2Measurements measurements = elwa2Adapter.readMeasurements();
+        HeatingRodStatus measurements = elwa2Adapter.readMeasurements();
         Temperature rodCurrentTemp = measurements.currentTemperature();
         Temperature rodTargetTemp = measurements.targetTemperature();
 
@@ -159,7 +159,7 @@ public class ManualWaterHeatingService {
 
         BatteryStatus batteryStatus = e3dcAdapter.readStatus();
         Power pvSurplus = batteryStatus.determineSolarPowerSurplus();
-        updateBatteryAssistState(rodCurrentTemp, batteryStatus.getBatteryStateOfCharge().getValue());
+        updateBatteryAssistState(rodCurrentTemp, batteryStatus.batteryStateOfCharge().getValue());
 
         Power batteryPower = batteryAssistActive.get()
                 ? determineAvailableBatteryPower(batteryStatus)
@@ -221,8 +221,8 @@ public class ManualWaterHeatingService {
     }
 
     private Power determineAvailableBatteryPower(BatteryStatus status) {
-        Power currentBatteryDischarge = status.getBatteryPower().isNegative()
-                ? status.getBatteryPower().negate()
+        Power currentBatteryDischarge = status.batteryPower().isNegative()
+                ? status.batteryPower().negate()
                 : Power.ZERO;
         Power headroom = Power.ofWatts(config.batteryMaxDischargePower())
                 .reduce(currentBatteryDischarge)

@@ -8,8 +8,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.bimalo.homeauto.boundary.elwa2.Elwa2Adapter;
-import de.bimalo.homeauto.boundary.elwa2.Elwa2Measurements;
-import de.bimalo.homeauto.boundary.elwa2.Elwa2Status;
+import de.bimalo.homeauto.entity.HeatingRodStatus;
+import de.bimalo.homeauto.boundary.elwa2.Elwa2OperatingStatus;
 import de.bimalo.homeauto.boundary.temperatureprotocol.TemperatureProtocolFileWriter;
 import de.bimalo.homeauto.boundary.viessman.VitodensAdapter;
 import de.bimalo.homeauto.entity.Power;
@@ -55,7 +55,7 @@ class TemperatureProtocolServiceTest {
     void recordTemperatures_writesEntryWithBothTemperatures_whenEnabled() {
         when(config.enabled()).thenReturn(true);
         when(elwa2Adapter.readMeasurements()).thenReturn(
-                new Elwa2Measurements(Temperature.ofCelsius(62.5), Temperature.ofCelsius(60.0), Power.ZERO, Elwa2Status.UNKNOWN, Instant.now()));
+                new HeatingRodStatus(Temperature.ofCelsius(62.5), Temperature.ofCelsius(60.0), Power.ZERO, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(vitodensAdapter.readHotWaterCurrentTemperature()).thenReturn(Temperature.ofCelsius(58.0));
 
         service.recordTemperatures();

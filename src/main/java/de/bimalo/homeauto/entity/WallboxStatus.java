@@ -1,28 +1,25 @@
 package de.bimalo.homeauto.entity;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 
 import de.bimalo.homeauto.boundary.goecharger.CarStatus;
 import lombok.Builder;
-import lombok.Getter;
 
 /**
  * Data class for the wallbox (electric vehicle charging) status.
  */
-@Getter
 @Builder
-public final class WallboxStatus {
-
-    private final CarStatus operatingStatus;
-    private final Power chargingPower;
-    private final Instant measuredAt;
+public record WallboxStatus(CarStatus operatingStatus, Power chargingPower, Instant measuredAt) {
 
     public boolean isCharging() {
         return operatingStatus == CarStatus.CHARGING;
     }
 
-    @Override
-    public String toString() {
-        return String.format("WallboxStatus[operatingStatus=%s, chargingPower=%s]", operatingStatus, chargingPower);
+    public boolean isOlderThan(Duration maximumAge, Clock clock) {
+        return !measuredAt.plus(maximumAge)
+                .isAfter(clock.instant());
     }
+
 }

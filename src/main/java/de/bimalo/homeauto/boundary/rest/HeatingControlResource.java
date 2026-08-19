@@ -1,7 +1,7 @@
 package de.bimalo.homeauto.boundary.rest;
 
 import de.bimalo.homeauto.boundary.elwa2.Elwa2Adapter;
-import de.bimalo.homeauto.boundary.elwa2.Elwa2Measurements;
+import de.bimalo.homeauto.entity.HeatingRodStatus;
 import de.bimalo.homeauto.control.heatingcontrol.HeatingControlService;
 import de.bimalo.homeauto.entity.Season;
 import de.bimalo.homeauto.entity.HeatingStatus;
@@ -40,7 +40,7 @@ public class HeatingControlResource {
     public HeatingStatus getStatus() {
         log.debug("REST: Getting heating status");
 
-        Elwa2Measurements measurements;
+        HeatingRodStatus measurements;
         try {
             measurements = elwa2Adapter.readMeasurements();
         } catch (RuntimeException ex) {

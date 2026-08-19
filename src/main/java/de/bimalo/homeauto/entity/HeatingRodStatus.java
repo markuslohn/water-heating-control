@@ -1,17 +1,18 @@
-package de.bimalo.homeauto.boundary.elwa2;
+package de.bimalo.homeauto.entity;
 
-import de.bimalo.homeauto.entity.Power;
-import de.bimalo.homeauto.entity.Temperature;
+import de.bimalo.homeauto.boundary.elwa2.Elwa2OperatingStatus;
+import lombok.Builder;
 
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 
-public record Elwa2Measurements(
+@Builder
+public record HeatingRodStatus(
         Temperature currentTemperature,
         Temperature targetTemperature,
         Power currentPower,
-        Elwa2Status operatingStatus,
+        Elwa2OperatingStatus operatingStatus,
         Instant measuredAt) {
 
     public boolean targetTemperatureReached() {

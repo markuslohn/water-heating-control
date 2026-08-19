@@ -4,38 +4,15 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import lombok.Builder;
-import lombok.Getter;
 
-/**
- * Data class for the main power data of the battery storage.
- */
-@Getter
 @Builder
-public final class BatteryStatus {
-
-    private final Instant measuredAt;
-
-    private final Power productionPower;
-
-    private final Power consumptionPower;
-
-    private final Power batteryPower;
-
-    private final Power gridPower;
-
-    private final Percentage batteryStateOfCharge;
-
-    @Override
-    public String toString() {
-        return String.format(
-                "BatteryStatus[time= %s, PV-Power= %s, Battery-Power= %s, Home consumption= %s, Grid-Power= %s, Battery SOC= %s]",
-                measuredAt,
-                productionPower,
-                batteryPower,
-                consumptionPower,
-                gridPower,
-                batteryStateOfCharge);
-    }
+public record BatteryStatus(
+        Instant measuredAt,
+        Power productionPower,
+        Power consumptionPower,
+        Power batteryPower,
+        Power gridPower,
+        Percentage batteryStateOfCharge) {
 
     /**
      * Determines the pure solar power surplus available.

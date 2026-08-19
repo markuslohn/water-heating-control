@@ -2,7 +2,7 @@ package de.bimalo.homeauto.control.heatingcontrol;
 
 import de.bimalo.homeauto.boundary.e3dc.E3dcAdapter;
 import de.bimalo.homeauto.boundary.elwa2.Elwa2Adapter;
-import de.bimalo.homeauto.boundary.elwa2.Elwa2Measurements;
+import de.bimalo.homeauto.entity.HeatingRodStatus;
 import de.bimalo.homeauto.entity.BatteryStatus;
 import de.bimalo.homeauto.entity.Power;
 import de.bimalo.homeauto.entity.Season;
@@ -164,7 +164,7 @@ public class HeatingControlService {
      * @return TemperatureCheck containing current and target temperatures
      */
     private TemperatureCheck checkTemperature() {
-        Elwa2Measurements measurements = elwa2Adapter.readMeasurements();
+        HeatingRodStatus measurements = elwa2Adapter.readMeasurements();
         Temperature currentTemperature = measurements.currentTemperature();
         Temperature targetTemperature = measurements.targetTemperature();
 
