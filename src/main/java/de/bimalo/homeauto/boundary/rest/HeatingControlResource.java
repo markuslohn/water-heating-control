@@ -11,6 +11,7 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.ServiceUnavailableException;
 import jakarta.ws.rs.core.MediaType;
 import lombok.extern.slf4j.Slf4j;
 
@@ -43,7 +44,7 @@ public class HeatingControlResource {
         try {
             measurements = elwa2Adapter.readMeasurements();
         } catch (RuntimeException ex) {
-            measurements = elwa2Adapter.getLastKnownMeasurements().orElseThrow();
+            measurements = elwa2Adapter.getLastKnownMeasurements().orElseThrow(ServiceUnavailableException::new);
         }
 
         Power power = measurements.currentPower();
