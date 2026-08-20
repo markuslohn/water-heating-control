@@ -52,13 +52,15 @@ public final class Elwa2ModbusClient extends AbstractModbusClient {
     public Temperature readTemperature1() {
         Elwa2Register register = Elwa2Register.TEMP_1;
         int rawValue = this.readUnsignedInteger(register.getAddress());
-        return Temperature.ofCelsius(rawValue * register.getScaleFactor());
+        double temperature = scaleReadValue(rawValue, register.getScaleFactor());
+        return Temperature.ofCelsius(temperature);
     }
 
     public Temperature readTargetTemperature() {
         Elwa2Register register = Elwa2Register.TARGET_TEMP;
         int rawValue = this.readUnsignedInteger(register.getAddress());
-        return Temperature.ofCelsius(rawValue * register.getScaleFactor());
+        double temperature = scaleReadValue(rawValue, register.getScaleFactor());
+        return Temperature.ofCelsius(temperature);
     }
 
     public Elwa2OperatingStatus readStatus() {

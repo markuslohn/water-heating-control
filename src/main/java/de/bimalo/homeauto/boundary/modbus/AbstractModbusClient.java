@@ -362,6 +362,29 @@ public abstract class AbstractModbusClient implements AutoCloseable {
      */
     protected abstract DeviceInfo readDeviceInfo();
 
+    protected double scaleReadValue(int rawValue, double factor) {
+        return rawValue * factor;
+    }
+
+    protected int scaleReadEnumValue(int rawValue, double factor) {
+        double scaledValue = rawValue * factor;
+        long roundedValue = Math.round(scaledValue);
+
+        if (Math.abs(scaledValue - roundedValue) > 0.000_001) {
+            throw new IllegalArgumentException("Scaled enum value is not an integer: " + scaledValue);
+        }
+
+        return Math.toIntExact(roundedValue);
+    }
+
+    protected int scaleWriteValue(double value, double factor) {
+        if (!Double.isFinite(value) || !Double.isFinite(factor)) {
+            throw new IllegalArgumentException("Value and scale factor must be finite");
+        }
+
+        return Math.toIntExact(Math.round(value * factor));
+    }
+
     private void checkConnectivity() {
         if (!isConnected()) {
             throw new ModbusConnectionException("Modbus client is not connected", host, port, null);

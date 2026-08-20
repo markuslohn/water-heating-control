@@ -23,18 +23,6 @@ public final class VitodensModbusClient extends AbstractModbusClient {
                 .build();
     }
 
-    private int convertToRawValue(int value, double factor) {
-        return Double.valueOf(value * factor).intValue();
-    }
-
-    private double scaleReadValue(int rawValue, double factor) {
-        return rawValue * factor;
-    }
-
-    private int scaleWriteValue(double value, double factor) {
-        return (int) Math.round(value * factor);
-    }
-
     public boolean gatewayConnected() {
         VitodensRegister register = VitodensRegister.STATUS;
         int rawValue = readDiscreteInputStatus(register.getAddress());
@@ -49,21 +37,21 @@ public final class VitodensModbusClient extends AbstractModbusClient {
         VitodensRegister register = VitodensRegister.EXTERNAL_REQUEST;
         log.trace("Write value {} to register {}, {}.", requestMode.getValue(), register.getAddress(),
                 register.getDescription());
-        this.writeUnsignedInteger(register.getAddress(),
-                convertToRawValue(requestMode.getValue(), register.getWriteFactor()));
+        writeUnsignedInteger(register.getAddress(),
+                scaleWriteValue(requestMode.getValue(), register.getWriteFactor()));
     }
 
     public ExternalRequestMode readExternalRequestStatus() {
         VitodensRegister register = VitodensRegister.EXTERNAL_REQUEST_STATUS;
         int rawValue = this.readInputUnsignedInteger(register.getAddress());
-        int value = (int) Math.round(scaleReadValue(rawValue, register.getReadFactor()));
-        return ExternalRequestMode.fromValue(value);
+        return ExternalRequestMode.fromValue(scaleReadEnumValue(rawValue, register.getReadFactor()));
     }
 
     public Temperature readHotWaterTargetTemperature() {
         VitodensRegister register = VitodensRegister.HOT_WATER_TARGET_TEMPERATUR;
         int rawValue = readInputInteger(register.getAddress());
-        return Temperature.ofCelsius(scaleReadValue(rawValue, register.getReadFactor()));
+        double temperature = scaleReadValue(rawValue, register.getReadFactor());
+        return Temperature.ofCelsius(temperature);
     }
 
     public void writeHotWaterTargetTemperature(Temperature temperature) {
@@ -80,44 +68,46 @@ public final class VitodensModbusClient extends AbstractModbusClient {
         VitodensRegister register = VitodensRegister.HOT_WATER_HEATING_PROGRAMM_TARGET;
         log.trace("Write value {} to register {}, {}.", program.getValue(), register.getAddress(),
                 register.getDescription());
-        this.writeUnsignedInteger(register.getAddress(),
-                convertToRawValue(program.getValue(), register.getWriteFactor()));
+        writeUnsignedInteger(register.getAddress(), scaleWriteValue(program.getValue(), register.getWriteFactor()));
     }
 
     public HotWaterProgram readHotWaterHeatingProgramCurrentStatus() {
         VitodensRegister register = VitodensRegister.HOT_WATER_HEATING_PROGRAMM_CURRENT;
-        int rawValue = convertToRawValue(this.readInteger(register.getAddress()), register.getReadFactor());
-        return HotWaterProgram.fromValue(rawValue);
+        int rawValue = this.readInteger(register.getAddress());
+        return HotWaterProgram.fromValue(scaleReadEnumValue(rawValue, register.getReadFactor()));
     }
 
     public Temperature readHotWaterCurrentTemperature() {
         VitodensRegister register = VitodensRegister.HOT_WATER_CURRENT_TEMPERATURE;
-        double rawValue = convertToRawValue(this.readInputInteger(register.getAddress()), register.getReadFactor());
-        return Temperature.ofCelsius(rawValue);
+        int rawValue = readInputInteger(register.getAddress());
+        double temperature = scaleReadValue(rawValue, register.getReadFactor());
+        return Temperature.ofCelsius(temperature);
     }
 
     public Temperature readOutsideTemperature() {
         VitodensRegister register = VitodensRegister.OUTSIDE_TEMPERATURE;
-        double rawValue = convertToRawValue(this.readInputInteger(register.getAddress()), register.getReadFactor());
-        return Temperature.ofCelsius(rawValue);
+        int rawValue = readInputInteger(register.getAddress());
+        double temperature = scaleReadValue(rawValue, register.getReadFactor());
+        return Temperature.ofCelsius(temperature);
     }
 
     public HotWaterStatus readHotWaterStatus() {
         VitodensRegister register = VitodensRegister.HOT_WATER_STATUS;
-        int rawValue = convertToRawValue(this.readInputUnsignedInteger(register.getAddress()),
-                register.getReadFactor());
-        return HotWaterStatus.fromValue(rawValue);
+        int rawValue = this.readInputUnsignedInteger(register.getAddress());
+        return HotWaterStatus.fromValue(scaleReadEnumValue(rawValue, register.getReadFactor()));
     }
 
     public Volume readHotWaterGasConsumptionToday() {
         VitodensRegister register = VitodensRegister.HOT_WATER_GAS_CONSUMPTION_TODAY;
-        double rawValue = convertToRawValue(this.readInputInteger(register.getAddress()), register.getReadFactor());
-        return Volume.ofCubicMeters(rawValue);
+        int rawValue = readInputInteger(register.getAddress());
+        double cubicMeters = scaleReadValue(rawValue, register.getReadFactor());
+        return Volume.ofCubicMeters(cubicMeters);
     }
 
     public Volume readHotWaterGasConsumptionThisMonth() {
         VitodensRegister register = VitodensRegister.HOT_WATER_GAS_CONSUMPTION_THIS_MONTH;
-        double rawValue = convertToRawValue(this.readInputInteger(register.getAddress()), register.getReadFactor());
-        return Volume.ofCubicMeters(rawValue);
+        int rawValue = readInputInteger(register.getAddress());
+        double cubicMeters = scaleReadValue(rawValue, register.getReadFactor());
+        return Volume.ofCubicMeters(cubicMeters);
     }
 }
