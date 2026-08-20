@@ -103,7 +103,7 @@ public class HeatingControlService {
         try {
             // Read current heating power once per control cycle to avoid multiple service
             // calls
-            Power currentHeatingPower = elwa2Adapter.readMeasurements().currentPower();
+            Power currentHeatingPower = elwa2Adapter.readStatus().currentPower();
             TemperatureCheck tempCheck = checkTemperature();
 
             // Manual mode: automatic control is fully suspended. An external controller
@@ -164,7 +164,7 @@ public class HeatingControlService {
      * @return TemperatureCheck containing current and target temperatures
      */
     private TemperatureCheck checkTemperature() {
-        HeatingRodStatus measurements = elwa2Adapter.readMeasurements();
+        HeatingRodStatus measurements = elwa2Adapter.readStatus();
         Temperature currentTemperature = measurements.currentTemperature();
         Temperature targetTemperature = measurements.targetTemperature();
 

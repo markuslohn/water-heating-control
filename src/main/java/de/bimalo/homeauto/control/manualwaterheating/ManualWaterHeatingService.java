@@ -122,7 +122,7 @@ public class ManualWaterHeatingService {
     }
 
     private void runCycle() {
-        HeatingRodStatus measurements = elwa2Adapter.readMeasurements();
+        HeatingRodStatus measurements = elwa2Adapter.readStatus();
         Temperature rodCurrentTemp = measurements.currentTemperature();
         Temperature rodTargetTemp = measurements.targetTemperature();
 

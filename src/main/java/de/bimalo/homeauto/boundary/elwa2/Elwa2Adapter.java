@@ -29,7 +29,7 @@ public class Elwa2Adapter {
     private final Elwa2ModbusClient modbusClient;
     private Elwa2Config config;
 
-    private volatile HeatingRodStatus lastKnownMeasurements;
+    private volatile HeatingRodStatus lastKnownStatus;
 
     private volatile Duration powerCommandTimeout;
 
@@ -56,25 +56,33 @@ public class Elwa2Adapter {
 
     @PreDestroy
     public void shutdown() {
-        modbusClient.shutdown();
+        try {
+            stopHeating();
+        } catch (RuntimeException ex) {
+            log.error(
+                    "Failed to deactivate ELWA2 heating during shutdown",
+                    ex);
+        } finally {
+            modbusClient.shutdown();
+        }
     }
 
     @CircuitBreaker(requestVolumeThreshold = 4, failureRatio = 0.5, delay = 5000, successThreshold = 2)
     @Timeout(6000)
-    public HeatingRodStatus readMeasurements() {
-        HeatingRodStatus measurements = new HeatingRodStatus(
+    public HeatingRodStatus readStatus() {
+        HeatingRodStatus status = new HeatingRodStatus(
                 modbusClient.readTemperature1(),
                 modbusClient.readTargetTemperature(),
                 modbusClient.readPower(),
                 modbusClient.readStatus(),
                 Instant.now());
 
-        lastKnownMeasurements = measurements;
-        return measurements;
+        lastKnownStatus = status;
+        return status;
     }
 
-    public Optional<HeatingRodStatus> getLastKnownMeasurements() {
-        return Optional.ofNullable(lastKnownMeasurements);
+    public Optional<HeatingRodStatus> getLastKnownStatus() {
+        return Optional.ofNullable(lastKnownStatus);
     }
 
     public synchronized void stopHeating() {
@@ -140,8 +148,8 @@ public class Elwa2Adapter {
             if (elapsed.compareTo(powerCommandTimeout.dividedBy(2)) >= 0) {
                 adjustHeating(lastRequestedPower);
             }
-        } catch (Exception e) {
-            log.error("Failed to refresh heating power request for ELWA2", e);
+        } catch (RuntimeException ex) {
+            log.error("Failed to refresh heating power request for ELWA2", ex);
         }
     }
 

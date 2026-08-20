@@ -48,15 +48,16 @@ class TemperatureProtocolServiceTest {
 
         service.recordTemperatures();
 
-        verify(elwa2Adapter, never()).readMeasurements();
+        verify(elwa2Adapter, never()).readStatus();
         verify(fileWriter, never()).append(any());
     }
 
     @Test
     void recordTemperatures_writesEntryWithBothTemperatures_whenEnabled() {
         when(config.enabled()).thenReturn(true);
-        when(elwa2Adapter.readMeasurements()).thenReturn(
-                new HeatingRodStatus(Temperature.ofCelsius(62.5), Temperature.ofCelsius(60.0), Power.ZERO, Elwa2OperatingStatus.UNKNOWN, Instant.now()));
+        when(elwa2Adapter.readStatus()).thenReturn(
+                new HeatingRodStatus(Temperature.ofCelsius(62.5), Temperature.ofCelsius(60.0), Power.ZERO,
+                        Elwa2OperatingStatus.UNKNOWN, Instant.now()));
         when(vitodensAdapter.readStatus()).thenReturn(
                 GasHeatingStatus.builder()
                         .active(false)
@@ -78,7 +79,7 @@ class TemperatureProtocolServiceTest {
     @Test
     void recordTemperatures_swallowsException_whenReadingTemperatureFails() {
         when(config.enabled()).thenReturn(true);
-        when(elwa2Adapter.readMeasurements()).thenThrow(new RuntimeException("Modbus timeout"));
+        when(elwa2Adapter.readStatus()).thenThrow(new RuntimeException("Modbus timeout"));
 
         assertDoesNotThrow(() -> service.recordTemperatures());
 

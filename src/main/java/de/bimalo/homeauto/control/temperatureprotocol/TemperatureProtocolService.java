@@ -45,7 +45,7 @@ public class TemperatureProtocolService {
         try {
             TemperatureLogEntry entry = TemperatureLogEntry.builder()
                     .timestamp(Instant.now())
-                    .heatingRodTemperature(elwa2Adapter.readMeasurements().currentTemperature())
+                    .heatingRodTemperature(elwa2Adapter.readStatus().currentTemperature())
                     .gasHeatingTemperature(vitodensAdapter.readStatus().currentTemperature())
                     .build();
             fileWriter.append(entry);

@@ -42,9 +42,9 @@ public class HeatingControlResource {
 
         HeatingRodStatus measurements;
         try {
-            measurements = elwa2Adapter.readMeasurements();
+            measurements = elwa2Adapter.readStatus();
         } catch (RuntimeException ex) {
-            measurements = elwa2Adapter.getLastKnownMeasurements().orElseThrow(ServiceUnavailableException::new);
+            measurements = elwa2Adapter.getLastKnownStatus().orElseThrow(ServiceUnavailableException::new);
         }
 
         Power power = measurements.currentPower();
