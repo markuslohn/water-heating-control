@@ -88,7 +88,7 @@ public class Power {
      */
     public String format() {
         if (Math.abs(watts) >= 1000) {
-            return String.format("%.2f kWh", getKilowatts());
+            return String.format("%.2f kW", getKilowatts());
         }
         return watts + " W";
     }
