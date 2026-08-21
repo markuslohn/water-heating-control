@@ -1,5 +1,7 @@
 package de.bimalo.homeauto.boundary.goecharger;
 
+import de.bimalo.homeauto.boundary.modbus.ModbusClientException;
+import de.bimalo.homeauto.entity.CarStatus;
 import de.bimalo.homeauto.entity.Power;
 import de.bimalo.homeauto.entity.WallboxStatus;
 import jakarta.annotation.PostConstruct;
@@ -12,6 +14,7 @@ import java.time.Instant;
 import java.util.Optional;
 
 import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
+import org.eclipse.microprofile.faulttolerance.Retry;
 import org.eclipse.microprofile.faulttolerance.Timeout;
 
 /**
@@ -46,6 +49,7 @@ public class GoEchargerAdapter {
         modbusClient.shutdown();
     }
 
+    @Retry(maxRetries = 2, delay = 200, retryOn = ModbusClientException.class, abortOn = IllegalArgumentException.class)
     @CircuitBreaker(requestVolumeThreshold = 4, failureRatio = 0.5, delay = 5000, successThreshold = 2)
     @Timeout(5000)
     public WallboxStatus readStatus() {
@@ -63,6 +67,10 @@ public class GoEchargerAdapter {
 
     public Optional<WallboxStatus> getLastKnownStatus() {
         return Optional.ofNullable(lastKnownStatus);
+    }
+
+    public boolean isConnected() {
+        return modbusClient.isConnected();
     }
 
 }

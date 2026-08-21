@@ -164,6 +164,31 @@
             font-weight: 500;
         }
 
+        .status-box.status-stale {
+            box-shadow: 0 0 0 3px #f59e0b, 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .stale-badge {
+            display: inline-block;
+            margin-left: 6px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.75em;
+            font-weight: 600;
+            background: #f59e0b;
+            color: white;
+        }
+
+        .status-box.status-error h2 {
+            color: #ef4444;
+            border-bottom-color: #ef4444;
+        }
+
+        .error-badge {
+            color: #ef4444;
+            font-weight: 500;
+        }
+
         .control-box {
             background: white;
             border-radius: 15px;
@@ -283,8 +308,8 @@
 
         <div class="status-grid">
             <!-- Energie -->
-            <div class="status-box">
-                <h2>☀️ Energie</h2>
+            <div class="status-box" id="energy-status-box">
+                <h2>☀️ Energie <span id="energy-badge" class="stale-badge" style="display:none"></span></h2>
                 <div class="status-item">
                     <span class="status-label">PV-Produktion:</span>
                     <span class="status-value positive" id="battery-production">-</span>
@@ -300,8 +325,8 @@
             </div>
 
             <!-- Batteriestatus -->
-            <div class="status-box">
-                <h2>⚡ Batteriestatus</h2>
+            <div class="status-box" id="battery-status-box">
+                <h2>⚡ Batteriestatus <span id="battery-badge" class="stale-badge" style="display:none"></span></h2>
                 <div class="status-item">
                     <span class="status-label">Batterieladung:</span>
                     <span class="status-value" id="battery-soc">-</span>
@@ -316,7 +341,7 @@
         <div class="status-grid status-grid-3">
             <!-- Elektroauto -->
             <div class="status-box" id="wallbox-status-box">
-                <h2>🚗 Elektroauto</h2>
+                <h2>🚗 Elektroauto <span id="wallbox-badge" class="stale-badge" style="display:none"></span></h2>
                 <div class="status-item">
                     <span class="status-label">Lädt:</span>
                     <span class="status-value" id="wallbox-charging">-</span>
@@ -329,7 +354,7 @@
 
             <!-- Heizstab-Status -->
             <div class="status-box" id="heating-status-box">
-                <h2>🔥 Heizstab</h2>
+                <h2>🔥 Heizstab <span id="heating-badge" class="stale-badge" style="display:none"></span></h2>
                 <div class="status-item">
                     <span class="status-label">Status:</span>
                     <span class="status-value" id="heating-active">-</span>
@@ -350,7 +375,7 @@
 
             <!-- Gasheizung -->
             <div class="status-box" id="gasheating-status-box">
-                <h2>🔥 Gasheizung</h2>
+                <h2>🔥 Gasheizung <span id="gasheating-badge" class="stale-badge" style="display:none"></span></h2>
                 <div class="status-item">
                     <span class="status-label">Status:</span>
                     <span class="status-value" id="gasheating-active">-</span>
@@ -473,17 +498,57 @@
             banner.className = 'hotwater-banner ' + level.className;
         }
 
-        async function updateStatus() {
-            console.log('[DEBUG] updateStatus called at:', new Date().toLocaleTimeString('de-DE'));
+        // Fetches JSON and throws (with the HTTP status attached) on a non-2xx
+        // response, instead of silently trying to parse an error body as data.
+        async function fetchJson(url) {
+            const response = await fetch(url);
+            if (!response.ok) {
+                const error = new Error(`${url} -> HTTP ${response.status}`);
+                error.status = response.status;
+                throw error;
+            }
+            return response.json();
+        }
 
+        function formatStaleTime(measuredAt) {
+            if (!measuredAt) return '';
+            return new Date(measuredAt).toLocaleTimeString('de-DE');
+        }
+
+        // Toggles the "stale" (yellow, last-known-value) marker on a status box,
+        // independent of whether that box is also active/inactive-colored.
+        function markStale(boxId, badgeId, data) {
+            const box = document.getElementById(boxId);
+            const badge = document.getElementById(badgeId);
+            if (box) box.classList.toggle('status-stale', !!data.stale);
+            if (badge) {
+                if (data.stale) {
+                    badge.textContent = `⚠️ Stand ${formatStaleTime(data.measuredAt)}`;
+                    badge.style.display = '';
+                } else {
+                    badge.style.display = 'none';
+                }
+            }
+        }
+
+        // Marks a status box as failed (device unreachable and nothing usable
+        // cached) without touching whatever values are still displayed from a
+        // previous successful update.
+        function markError(boxId, badgeId, error) {
+            console.error(`[ERROR] ${boxId}:`, error);
+            const box = document.getElementById(boxId);
+            const badge = document.getElementById(badgeId);
+            if (box) box.classList.add('status-error');
+            if (badge) {
+                badge.textContent = error && error.status === 503 ? '❌ nicht verfügbar' : '❌ Fehler';
+                badge.className = 'error-badge';
+                badge.style.display = '';
+            }
+        }
+
+        async function updateBatteryStatus() {
             try {
-                // Battery Status
-                console.log('[DEBUG] Fetching battery status...');
-                const batteryResponse = await fetch('/api/battery/status');
-                console.log('[DEBUG] Battery response status:', batteryResponse.status);
-
-                const battery = await batteryResponse.json();
-                console.log('[DEBUG] Battery data:', battery);
+                const battery = await fetchJson('/api/battery/status');
 
                 document.getElementById('battery-soc').textContent = formatPercentage(battery.batteryStateOfCharge.value);
                 document.getElementById('battery-production').textContent = formatPower(battery.productionPower.watts);
@@ -495,13 +560,20 @@
                 gridElement.textContent = formatPower(gridPower);
                 gridElement.className = 'status-value ' + (gridPower > 0 ? 'negative' : 'positive');
 
-                // Heating Status
-                console.log('[DEBUG] Fetching heating status...');
-                const heatingResponse = await fetch('/api/heatingrod/status');
-                console.log('[DEBUG] Heating response status:', heatingResponse.status);
+                markStale('energy-status-box', 'energy-badge', battery);
+                markStale('battery-status-box', 'battery-badge', battery);
+                document.getElementById('energy-status-box').classList.remove('status-error');
+                document.getElementById('battery-status-box').classList.remove('status-error');
+            } catch (error) {
+                markError('energy-status-box', 'energy-badge', error);
+                markError('battery-status-box', 'battery-badge', error);
+                throw error;
+            }
+        }
 
-                const heating = await heatingResponse.json();
-                console.log('[DEBUG] Heating data:', heating);
+        async function updateHeatingStatus() {
+            try {
+                const heating = await fetchJson('/api/heatingrod/status');
 
                 document.getElementById('heating-active').textContent = heating.active ? '🟢 AN' : '🔴 AUS';
                 document.getElementById('heating-power').textContent = `${heating.power.watts} W`;
@@ -514,38 +586,39 @@
 
                 const box = document.getElementById('heating-status-box');
                 box.className = 'status-box ' + (heating.active ? 'status-active' : 'status-inactive');
+                markStale('heating-status-box', 'heating-badge', heating);
 
-                // Battery Priority Status
-                console.log('[DEBUG] Fetching battery priority status...');
-                const priorityResponse = await fetch('/api/battery/priority');
-                console.log('[DEBUG] Battery priority response status:', priorityResponse.status);
+                updateHotWaterBanner(heating.currentTemperature.celsius);
+            } catch (error) {
+                markError('heating-status-box', 'heating-badge', error);
+                throw error;
+            }
+        }
 
-                const priorityData = await priorityResponse.json();
-                console.log('[DEBUG] Battery priority data:', priorityData);
+        async function updateBatteryPriorityStatus() {
+            const priorityData = await fetchJson('/api/battery/priority');
+            document.getElementById('battery-priority-status').textContent = priorityData.active ? '🟢 AKTIV' : '🔴 DEAKTIVIERT';
+        }
 
-                document.getElementById('battery-priority-status').textContent = priorityData.active ? '🟢 AKTIV' : '🔴 DEAKTIVIERT';
-
-                // Wallbox Status
-                console.log('[DEBUG] Fetching wallbox status...');
-                const wallboxResponse = await fetch('/api/wallbox/status');
-                console.log('[DEBUG] Wallbox response status:', wallboxResponse.status);
-
-                const wallbox = await wallboxResponse.json();
-                console.log('[DEBUG] Wallbox data:', wallbox);
+        async function updateWallboxStatus() {
+            try {
+                const wallbox = await fetchJson('/api/wallbox/status');
 
                 document.getElementById('wallbox-charging').textContent = wallbox.charging ? '🟢 JA' : '🔴 NEIN';
                 document.getElementById('wallbox-power').textContent = formatPower(wallbox.chargingPower.watts);
 
                 const wallboxBox = document.getElementById('wallbox-status-box');
                 wallboxBox.className = 'status-box ' + (wallbox.charging ? 'status-active' : 'status-inactive');
+                markStale('wallbox-status-box', 'wallbox-badge', wallbox);
+            } catch (error) {
+                markError('wallbox-status-box', 'wallbox-badge', error);
+                throw error;
+            }
+        }
 
-                // Gas Heating Status
-                console.log('[DEBUG] Fetching gas heating status...');
-                const gasHeatingResponse = await fetch('/api/gasheating/status');
-                console.log('[DEBUG] Gas heating response status:', gasHeatingResponse.status);
-
-                const gasHeating = await gasHeatingResponse.json();
-                console.log('[DEBUG] Gas heating data:', gasHeating);
+        async function updateGasHeatingStatus() {
+            try {
+                const gasHeating = await fetchJson('/api/gasheating/status');
 
                 document.getElementById('gasheating-active').textContent = gasHeating.active ? '🟢 AN' : '🔴 AUS';
                 document.getElementById('gasheating-current-temp').textContent = formatTemperature(gasHeating.currentTemperature);
@@ -553,37 +626,51 @@
 
                 const gasHeatingBox = document.getElementById('gasheating-status-box');
                 gasHeatingBox.className = 'status-box ' + (gasHeating.active ? 'status-active' : 'status-inactive');
-
-                updateHotWaterBanner(heating.currentTemperature.celsius);
-
-                // Manual Water Heating Status
-                console.log('[DEBUG] Fetching manual water heating status...');
-                const manualHeatingResponse = await fetch('/api/manual-water-heating/status');
-                console.log('[DEBUG] Manual water heating response status:', manualHeatingResponse.status);
-
-                const manualHeating = await manualHeatingResponse.json();
-                console.log('[DEBUG] Manual water heating data:', manualHeating);
-
-                document.getElementById('manual-heating-status').textContent =
-                    manualHeating.active ? '🟢 AKTIV' : '🔴 INAKTIV';
-
-                const sourceLabels = { PV: '☀️ PV', BATTERY: '🔋 Batterie', GAS: '🔥 Gas', NONE: '⏸️ Keine' };
-                const sourceRow = document.getElementById('manual-heating-source-row');
-                if (manualHeating.active) {
-                    sourceRow.style.display = '';
-                    document.getElementById('manual-heating-source').textContent =
-                        sourceLabels[manualHeating.source] || manualHeating.source;
-                } else {
-                    sourceRow.style.display = 'none';
-                }
-
-                // Update timestamp
-                document.getElementById('last-update').textContent = new Date().toLocaleTimeString('de-DE');
-                console.log('[DEBUG] Update completed successfully');
+                markStale('gasheating-status-box', 'gasheating-badge', gasHeating);
             } catch (error) {
-                console.error('[ERROR] Error updating status:', error);
-                console.error('[ERROR] Error stack:', error.stack);
+                markError('gasheating-status-box', 'gasheating-badge', error);
+                throw error;
             }
+        }
+
+        async function updateManualHeatingStatus() {
+            const manualHeating = await fetchJson('/api/manual-water-heating/status');
+
+            document.getElementById('manual-heating-status').textContent =
+                manualHeating.active ? '🟢 AKTIV' : '🔴 INAKTIV';
+
+            const sourceLabels = { PV: '☀️ PV', BATTERY: '🔋 Batterie', PV_AND_BATTERY: '☀️🔋 PV + Batterie', GAS: '🔥 Gas', NONE: '⏸️ Keine' };
+            const sourceRow = document.getElementById('manual-heating-source-row');
+            if (manualHeating.active) {
+                sourceRow.style.display = '';
+                document.getElementById('manual-heating-source').textContent =
+                    sourceLabels[manualHeating.source] || manualHeating.source;
+            } else {
+                sourceRow.style.display = 'none';
+            }
+        }
+
+        // Each status section is fetched and rendered independently via
+        // Promise.allSettled(): a failure in one (e.g. the optional wallbox
+        // being unreachable) must not prevent the others from updating.
+        async function updateStatus() {
+            const sections = [
+                ['battery', updateBatteryStatus],
+                ['heating', updateHeatingStatus],
+                ['batteryPriority', updateBatteryPriorityStatus],
+                ['wallbox', updateWallboxStatus],
+                ['gasHeating', updateGasHeatingStatus],
+                ['manualHeating', updateManualHeatingStatus],
+            ];
+
+            const results = await Promise.allSettled(sections.map(([, fn]) => fn()));
+            results.forEach((result, i) => {
+                if (result.status === 'rejected') {
+                    console.error(`[ERROR] Updating ${sections[i][0]} failed:`, result.reason);
+                }
+            });
+
+            document.getElementById('last-update').textContent = new Date().toLocaleTimeString('de-DE');
         }
 
         async function startManualWaterHeating() {

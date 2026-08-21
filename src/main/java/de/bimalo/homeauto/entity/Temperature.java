@@ -1,17 +1,9 @@
 package de.bimalo.homeauto.entity;
 
-import java.util.Objects;
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-
 /**
  * Represents a temperature value.
  */
-@Getter
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
-public class Temperature {
-    private final double celsius;
+public record Temperature(double celsius) {
 
     public static Temperature ofCelsius(double celsius) {
         return new Temperature(celsius);
@@ -40,20 +32,5 @@ public class Temperature {
     @Override
     public String toString() {
         return format();
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o)
-            return true;
-        if (o == null || getClass() != o.getClass())
-            return false;
-        Temperature that = (Temperature) o;
-        return Double.compare(that.celsius, celsius) == 0;
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(celsius);
     }
 }

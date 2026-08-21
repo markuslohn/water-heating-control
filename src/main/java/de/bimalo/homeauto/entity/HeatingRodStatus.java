@@ -1,6 +1,5 @@
 package de.bimalo.homeauto.entity;
 
-import de.bimalo.homeauto.boundary.elwa2.Elwa2OperatingStatus;
 import lombok.Builder;
 
 import java.time.Clock;
@@ -12,11 +11,10 @@ public record HeatingRodStatus(
         Temperature currentTemperature,
         Temperature targetTemperature,
         Power currentPower,
-        Elwa2OperatingStatus operatingStatus,
         Instant measuredAt) {
 
     public boolean targetTemperatureReached() {
-        return currentTemperature.getCelsius() >= targetTemperature.getCelsius();
+        return currentTemperature.celsius() >= targetTemperature.celsius();
     }
 
     public boolean isHeating() {

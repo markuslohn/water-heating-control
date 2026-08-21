@@ -1,5 +1,6 @@
-package de.bimalo.homeauto.entity;
+package de.bimalo.homeauto.boundary.rest;
 
+import de.bimalo.homeauto.entity.HeatingSource;
 import lombok.Builder;
 import lombok.Getter;
 

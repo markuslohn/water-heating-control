@@ -49,7 +49,7 @@ public final class VitodensModbusClient extends AbstractModbusClient {
 
     public Temperature readHotWaterTargetTemperature() {
         VitodensRegister register = VitodensRegister.HOT_WATER_TARGET_TEMPERATUR;
-        int rawValue = readInputInteger(register.getAddress());
+        int rawValue = readInteger(register.getAddress());
         double temperature = scaleReadValue(rawValue, register.getReadFactor());
         return Temperature.ofCelsius(temperature);
     }
@@ -57,7 +57,7 @@ public final class VitodensModbusClient extends AbstractModbusClient {
     public void writeHotWaterTargetTemperature(Temperature temperature) {
         VitodensRegister register = VitodensRegister.HOT_WATER_TARGET_TEMPERATUR;
         writeUnsignedInteger(register.getAddress(),
-                scaleWriteValue(temperature.getCelsius(), register.getWriteFactor()));
+                scaleWriteValue(temperature.celsius(), register.getWriteFactor()));
     }
 
     public void writeHotWaterHeatingProgram(HotWaterProgram program) {

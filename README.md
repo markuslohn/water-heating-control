@@ -23,8 +23,10 @@ This application provides **minute-by-minute monitoring and adjustment** to ensu
 ## Communication
 
 The application communicates via **Modbus TCP** with:
-- **ELWA2 Heating Rod** - for power control and temperature monitoring
-- **E3/DC Battery Storage** - for reading solar production, consumption, and available surplus
+- **ELWA2 Heating Rod** - for power control and temperature monitoring (required)
+- **E3/DC Battery Storage** - for reading solar production, consumption, and available surplus (required)
+- **Viessmann Vitodens Gas Heating** - for the manual mode's gas fallback (optional)
+- **go-eCharger Wallbox** - for EV charging status monitoring (optional)
 
 ### ELWA2 Configuration
 
@@ -39,8 +41,12 @@ The application includes a modern, responsive web interface for monitoring and m
 ### Features:
 - Real-time battery status (SOC, production, consumption, grid power)
 - Current heating rod status (power, temperatures)
+- Gas heating status (active state, current/target temperature)
+- Wallbox charging status (charging state, charging power)
 - Manual water heating mode with start/stop button and current heating source display
 - Battery priority override (disable until midnight)
+- Daily temperature protocol download (heating rod vs. gas heating temperature, CSV)
+- Application version/build info
 - Auto-refresh every 10 seconds
 
 ## Configuration
@@ -100,8 +106,8 @@ heatingctl.battery-reserved-power=1000
 # Temperature Hysteresis Configuration
 # Temperature difference (in °C) for restart after target is reached
 # Prevents frequent on/off cycling when temperature fluctuates near target
-# Example: With target 68°C and hysteresis 10°C, heating restarts at 58°C
-heatingctl.temperature-hysteresis=10.0
+# Example: With target 68°C and hysteresis 7°C, heating restarts at 61°C
+heatingctl.temperature-hysteresis=7.0
 
 # Percentage to reduce available solar power (safety margin)
 # Provides a buffer to avoid grid feed-in fluctuations
@@ -135,6 +141,10 @@ to gas heating when no electrical power is available. It replaces the previous f
 manual power control and suspends the automatic PV-surplus control (above) while active.
 
 ```properties
+# Maximum duration of one manually started heating session; the mode switches
+# itself off automatically once this elapses, regardless of temperature.
+manualwaterheating.maximum-duration=30m
+
 # Heating rod temperature (in °C) below which battery-assisted heating may start
 manualwaterheating.heating-rod-low-temperature-threshold=42.0
 
@@ -150,25 +160,25 @@ manualwaterheating.battery-soc-stop-threshold=50
 manualwaterheating.max-battery-soc-drop-percent=10
 
 # Maximum power (in watts) the battery may contribute to heating
-manualwaterheating.max-battery-heating-power=850
+manualwaterheating.max-battery-heating-power=800
 
 # Maximum total discharge power (in watts) the battery can deliver
-manualwaterheating.battery-max-discharge-power=1500
+manualwaterheating.battery-max-discharge-power=1400
 
 # Gas heating hot water temperature (in °C) below which gas heating is used as a fallback
 manualwaterheating.gas-heating-low-temperature-threshold=35.0
 
 # Offset (in °C) below the gas heating target temperature at which gas heating is switched
 # off (some hot water is still produced for a while after shutoff due to thermal inertia)
-manualwaterheating.gas-heating-shutoff-temperature-offset=5.0
+manualwaterheating.gas-heating-shutoff-temperature-offset=2.0
 ```
 
 **How It Works:**
-1. **PV surplus first**: If PV surplus is available, it is used fully for heating (source: `PV`) - not limited to the 850W battery cap.
-2. **Battery assist**: If PV surplus alone isn't enough, and the heating rod temperature drops below 42°C while battery SOC is above 65%, additional battery power is used (source: `BATTERY`), capped at 850W and at whatever headroom remains within the battery's 1500W total discharge capacity (accounting for power already used by the house). Once triggered, battery assist keeps running until the rod's target temperature is reached, SOC drops to the absolute 50% floor, or SOC has dropped by 10 percentage points since the session started (whichever comes first) - even if the temperature briefly rises back above 42°C.
+1. **PV surplus first**: If PV surplus is available, it is used fully for heating (source: `PV`) - not limited to the 800W battery cap.
+2. **Battery assist**: If PV surplus alone isn't enough, and the heating rod temperature drops below 42°C while battery SOC is above 65%, additional battery power is used on top of any PV surplus (source: `BATTERY` if PV surplus is zero, `PV_AND_BATTERY` if both contribute), capped at 800W and at whatever headroom remains within the battery's 1400W total discharge capacity (accounting for power already used by the house). Once triggered, battery assist keeps running until the rod's target temperature is reached, SOC drops to the absolute 50% floor, or SOC has dropped by 10 percentage points since the session started (whichever comes first) - even if the temperature briefly rises back above 42°C.
 3. **Grid protection**: If neither PV surplus nor battery headroom is available, no electrical heating happens at all - the heating rod is never powered from the grid.
-4. **Gas fallback**: If no electrical power is available and the gas heating hot water temperature drops below 35°C, gas heating is activated (source: `GAS`) until it reaches its target temperature minus the configured shutoff offset (default 5°C).
-5. **Automatic shutoff**: As soon as one of the defined targets is reached - the heating rod's target temperature, or (while gas heating was actively running) the gas heating target - manual water heating mode switches itself off entirely, resuming automatic PV-surplus control.
+4. **Gas fallback**: If no electrical power is available and the gas heating hot water temperature drops below 35°C, gas heating is activated (source: `GAS`) until it reaches its target temperature minus the configured shutoff offset (default 2°C).
+5. **Automatic shutoff**: As soon as one of the defined targets is reached - the heating rod's target temperature, the gas heating target (while gas heating was actively running), or the configured maximum session duration (default 30 minutes) - manual water heating mode switches itself off entirely, resuming automatic PV-surplus control.
 
 **Usage:**
 - Start/stop via the web interface button, or REST API: `POST /api/manual-water-heating/start` / `POST /api/manual-water-heating/stop`
@@ -312,25 +322,39 @@ java -jar build/quarkus-app/quarkus-run.jar
 Access at `http://localhost:8080/q/dev-ui` (only available in dev mode)
 
 **Health Checks:**
-Access at `http://localhost:8080/q/health`
+- Liveness (process up): `GET http://localhost:8080/q/health/live`
+- Readiness (required devices reachable): `GET http://localhost:8080/q/health/ready`
+- Combined: `GET http://localhost:8080/q/health`
 
 **API Endpoints:**
 - Battery Status: `GET http://localhost:8080/api/battery/status`
 - Battery Priority Status: `GET http://localhost:8080/api/battery/priority`
 - Battery Priority Override: `POST http://localhost:8080/api/battery/priority?disabled=<true/false>`
-- Heating Status: `GET http://localhost:8080/api/heatingrod/status`
+- Heating Rod Status: `GET http://localhost:8080/api/heatingrod/status`
+- Gas Heating Status: `GET http://localhost:8080/api/gasheating/status`
+- Wallbox Status: `GET http://localhost:8080/api/wallbox/status`
 - Manual Water Heating Status: `GET http://localhost:8080/api/manual-water-heating/status`
 - Manual Water Heating Start/Stop: `POST http://localhost:8080/api/manual-water-heating/start` / `POST http://localhost:8080/api/manual-water-heating/stop`
+- Temperature Protocol Download: `GET http://localhost:8080/api/temperature-protocol?date=<YYYY-MM-DD>` (CSV, defaults to today)
+- Version/Build Info: `GET http://localhost:8080/api/version`
 
 ## Architecture
 
+The project follows an Entity-Control-Boundary (ECB) layering: Boundaries own all Modbus/device communication, Controls contain the decision logic and never touch Modbus directly, Entities are framework-free domain value objects (`Power`, `Temperature`, `Percentage`, `HeatingDecision`, ...).
+
 ### Key Components
 
-- **HeatingControlService**: Seasonal schedulers that check and adjust heating based on time of year
-- **Elwa2Adapter**: Interface to the ELWA2 heating rod (Modbus communication)
-- **E3dcAdapter**: Interface to the E3/DC battery storage (Modbus communication)
-- **REST Resources**: Web API for monitoring and manual control
-- **Web UI**: Responsive single-page application for user interface
+**Control** (decision logic, no device I/O):
+- **HeatingControlService**: Orchestrator - owns the seasonal/manual schedules, reads device state via the Boundary adapters, and applies whichever decision the active policy returns. Also coordinates the two modes so they never fight over the heating rod: manual mode suspends automatic control while active.
+- **AutomaticHeatingPolicy**: Pure calculation of the PV-surplus/battery-priority/temperature-hysteresis decision for automatic mode.
+- **ManualWaterHeatingPolicy**: Pure calculation of the PV/battery-assist/gas-fallback decision for manual mode.
+- **TemperatureProtocolService**: Periodically records heating rod vs. gas heating temperatures to a daily CSV file.
+
+**Boundary** (Modbus/device communication and REST API):
+- **Elwa2Adapter** / **E3dcAdapter** / **VitodensAdapter** / **GoEchargerAdapter**: One adapter per physical device, each backed by an `AbstractModbusClient` subclass. Adapters apply resilience (Modbus connection retried on demand rather than only at startup, `@Retry`/`@CircuitBreaker`/`@Timeout` on device reads) and expose a "last known status" fallback for when a device is temporarily unreachable.
+- **REST Resources**: Web API for monitoring and manual control (see API Endpoints below).
+- **ModbusConnectivityHealthCheck**: MicroProfile Readiness check - reports the connection state of all four devices; only the battery storage (E3DC) and heating rod (ELWA2) affect the overall readiness status, since those are required for the core function.
+- **Web UI**: Responsive single-page application for user interface.
 - **Seasonal Predicates**: Control which seasons are active (WinterDisabledPredicate, etc.)
 
 ### Control Logic
@@ -367,9 +391,9 @@ Access at `http://localhost:8080/q/health`
      - Heating stops and enters "cooling mode"
      - Heating remains off even if surplus is available
    - Heating only restarts when temperature drops below (target - hysteresis):
-     - Example: With 10°C hysteresis, restarts at 58°C
+     - Example: With 7°C hysteresis, restarts at 61°C (for a 68°C target)
      - Prevents frequent on/off cycling near target temperature
-   - Configurable hysteresis value (default: 10°C)
+   - Configurable hysteresis value (default: 7°C)
 
 5. **Surplus Power Calculation**:
    - When battery priority is **ENABLED**:
@@ -393,6 +417,15 @@ Access at `http://localhost:8080/q/health`
    - Prioritizes battery charging when SOC is low
    - Sends commands via Modbus to ELWA2
 
+### Resilience
+
+Modbus devices are treated as unreliable dependencies throughout:
+
+- **No hard startup dependency**: if a device is unreachable when the application starts, startup still completes; the connection is retried transparently on the next actual device access instead of only once at boot.
+- **Retry before circuit breaker**: device reads use `@Retry` (2 retries, 200ms delay) before the `@CircuitBreaker` opens, so a single transient timeout doesn't need to trip the breaker or surface as a failure.
+- **Stale-but-available data, with an age limit**: REST status endpoints fall back to the last successfully read value when a live read fails, marking the response `stale: true` (with a `measuredAt` timestamp) so the UI can flag it. This fallback is only used up to a configurable maximum age (`reststatus.max-cache-age`, default `2m`); beyond that - or if nothing was ever read successfully - the endpoint returns `503 Service Unavailable` instead of silently serving arbitrarily old data. The dashboard itself fetches and renders each status section independently (`Promise.allSettled`), so one unreachable device (e.g. the optional wallbox) never blocks the others from updating.
+- **Readiness reflects required devices only**: `/q/health/ready` goes `DOWN` only when the battery storage (E3DC) or heating rod (ELWA2) is unreachable - the gas heating fallback and wallbox are optional and only reported for visibility, without affecting overall readiness.
+
 ## Java 25 Compatibility
 
 This project includes special configuration for Java 24+ compatibility:
@@ -403,13 +436,21 @@ This project includes special configuration for Java 24+ compatibility:
 
 ## Technology Stack
 
-- **Quarkus 3.28.4** - Supersonic Subatomic Java Framework
+- **Quarkus 3.33.3** - Supersonic Subatomic Java Framework
 - **Java 21** - Language level
-- **Modbus TCP 2.1.3** - Industrial protocol communication
+- **Modbus TCP 2.1.6** (digitalpetri) - Industrial protocol communication
+- **MicroProfile Fault Tolerance** - Retry, Circuit Breaker and Timeout on device reads
+- **MicroProfile Health** - Liveness and Readiness checks
 - **Lombok** - Boilerplate reduction
 - **Jackson** - JSON serialization
 - **Hibernate Validator** - Validation framework
 - **RESTEasy Reactive** - Reactive REST endpoints
+
+### Testing
+
+- **JUnit 5** + **Mockito** - Unit tests for the control/policy logic and device adapters, with Modbus clients mocked
+- **`@QuarkusTest`** + **RestAssured** - REST endpoint tests, with CDI beans swapped via `QuarkusMock`
+- Integration tests requiring a real device are tagged `integration` and excluded from the default `./gradlew test` run (`./gradlew integrationTest` to run them)
 
 ## License
 

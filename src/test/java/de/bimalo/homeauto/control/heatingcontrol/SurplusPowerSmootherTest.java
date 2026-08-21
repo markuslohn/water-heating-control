@@ -20,14 +20,14 @@ class SurplusPowerSmootherTest {
     void determineTargetPower_immediatelyAppliesDecrease_evenWithinSmoothingWindow() {
         Power result = smoother.determineTargetPower(Power.ofWatts(500), Power.ofWatts(2000), WINDOW, 0);
 
-        assertEquals(500, result.getWatts());
+        assertEquals(500, result.watts());
     }
 
     @Test
     void determineTargetPower_appliesFirstIncreaseImmediately_asSingleSampleAverage() {
         Power result = smoother.determineTargetPower(Power.ofWatts(1500), Power.ofWatts(0), WINDOW, 0);
 
-        assertEquals(1500, result.getWatts());
+        assertEquals(1500, result.watts());
     }
 
     @Test
@@ -39,7 +39,7 @@ class SurplusPowerSmootherTest {
 
         Power result = smoother.determineTargetPower(Power.ofWatts(3000), Power.ofWatts(0), WINDOW, 0);
 
-        assertEquals(2000, result.getWatts()); // average of 1000, 2000, 3000
+        assertEquals(2000, result.watts()); // average of 1000, 2000, 3000
     }
 
     @Test
@@ -49,28 +49,28 @@ class SurplusPowerSmootherTest {
 
         Power result = smoother.determineTargetPower(Power.ofWatts(3000), Power.ofWatts(0), WINDOW, 0);
 
-        assertEquals(3000, result.getWatts()); // 1000 sample pruned, only 3000 remains
+        assertEquals(3000, result.watts()); // 1000 sample pruned, only 3000 remains
     }
 
     @Test
     void determineTargetPower_suppressesChangeBelowThreshold() {
         Power result = smoother.determineTargetPower(Power.ofWatts(1099), Power.ofWatts(1000), WINDOW, 100);
 
-        assertEquals(1000, result.getWatts()); // delta of 99W < 100W threshold
+        assertEquals(1000, result.watts()); // delta of 99W < 100W threshold
     }
 
     @Test
     void determineTargetPower_appliesChangeAtExactThreshold() {
         Power result = smoother.determineTargetPower(Power.ofWatts(1100), Power.ofWatts(1000), WINDOW, 100);
 
-        assertEquals(1100, result.getWatts()); // delta of exactly 100W meets the threshold
+        assertEquals(1100, result.watts()); // delta of exactly 100W meets the threshold
     }
 
     @Test
     void determineTargetPower_suppressesDecreaseBelowThreshold() {
         Power result = smoother.determineTargetPower(Power.ofWatts(950), Power.ofWatts(1000), WINDOW, 100);
 
-        assertEquals(1000, result.getWatts()); // delta of 50W < 100W threshold, even though it's a decrease
+        assertEquals(1000, result.watts()); // delta of 50W < 100W threshold, even though it's a decrease
     }
 
     private static final class MutableClock extends Clock {

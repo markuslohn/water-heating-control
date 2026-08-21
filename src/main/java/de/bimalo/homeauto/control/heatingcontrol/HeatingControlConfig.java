@@ -35,13 +35,6 @@ public interface HeatingControlConfig {
     int maxHeatingPower();
 
     /**
-     * Schedule interval for the heating control check.
-     * Supports duration expressions like "1m", "30s", "2m30s".
-     */
-    @WithDefault("1m")
-    String scheduleInterval();
-
-    /**
      * Master switch to enable/disable battery priority feature completely.
      * If false, battery priority logic is never applied regardless of SOC.
      */

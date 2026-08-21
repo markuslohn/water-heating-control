@@ -20,8 +20,12 @@ import lombok.extern.slf4j.Slf4j;
 @Path("/api/temperature-protocol")
 public class TemperatureProtocolResource {
 
+    private final TemperatureProtocolFileWriter fileWriter;
+
     @Inject
-    TemperatureProtocolFileWriter fileWriter;
+    public TemperatureProtocolResource(TemperatureProtocolFileWriter fileWriter) {
+        this.fileWriter = fileWriter;
+    }
 
     /**
      * Returns the temperature protocol CSV for the given date (default: today,

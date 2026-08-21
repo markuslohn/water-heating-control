@@ -1,5 +1,6 @@
 package de.bimalo.homeauto.entity;
 
+import java.time.Instant;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -18,11 +19,15 @@ public final class HeatingStatus {
     private final String season;
     private final String seasonEmoji;
     private final boolean seasonEnabled;
+    private final boolean stale;
+    private final Instant measuredAt;
 
     @Override
     public String toString() {
         return String.format(
-                "HeatingStatus[active=%s, power=%s, currentTemp=%s, targetTemp=%s, manualMode=%s, season=%s, seasonEnabled=%s]",
-                active, power, currentTemperature, targetTemperature, manualMode, season, seasonEnabled);
+                "HeatingStatus[active=%s, power=%s, currentTemp=%s, targetTemp=%s, manualMode=%s, season=%s, "
+                        + "seasonEnabled=%s, stale=%s, measuredAt=%s]",
+                active, power, currentTemperature, targetTemperature, manualMode, season, seasonEnabled, stale,
+                measuredAt);
     }
 }

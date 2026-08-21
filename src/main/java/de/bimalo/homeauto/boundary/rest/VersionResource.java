@@ -11,8 +11,12 @@ import jakarta.ws.rs.core.MediaType;
 @Path("/api/version")
 public class VersionResource {
 
+    private final VersionService versionService;
+
     @Inject
-    VersionService versionService;
+    public VersionResource(VersionService versionService) {
+        this.versionService = versionService;
+    }
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)

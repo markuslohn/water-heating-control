@@ -1,5 +1,7 @@
 package de.bimalo.homeauto.control.manualwaterheating;
 
+import java.time.Duration;
+
 import io.smallrye.config.ConfigMapping;
 import io.smallrye.config.WithDefault;
 import jakarta.validation.constraints.Min;
@@ -13,6 +15,10 @@ import jakarta.validation.constraints.Min;
  */
 @ConfigMapping(prefix = "manualwaterheating")
 public interface ManualWaterHeatingConfig {
+
+    /** Maximum duration of one manually started heating session. */
+    @WithDefault("30m")
+    Duration maximumDuration();
 
     /**
      * Heating rod temperature (in °C) below which battery-assisted heating is

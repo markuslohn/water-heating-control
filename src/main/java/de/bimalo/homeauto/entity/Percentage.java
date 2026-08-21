@@ -1,24 +1,18 @@
 package de.bimalo.homeauto.entity;
 
-import java.util.Objects;
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-
 /**
  * Represents a percentage value (0-100)
  */
-@Getter
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
-public class Percentage {
+public record Percentage(int value) {
 
-    private final int value;
-
-    public static Percentage of(int value) {
+    public Percentage {
         if (value < 0 || value > 100) {
             throw new IllegalArgumentException(
                     "Percentage must be between 0 and 100, got: " + value);
         }
+    }
+
+    public static Percentage of(int value) {
         return new Percentage(value);
     }
 
@@ -65,20 +59,5 @@ public class Percentage {
     @Override
     public String toString() {
         return format();
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o)
-            return true;
-        if (o == null || getClass() != o.getClass())
-            return false;
-        Percentage that = (Percentage) o;
-        return value == that.value;
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(value);
     }
 }

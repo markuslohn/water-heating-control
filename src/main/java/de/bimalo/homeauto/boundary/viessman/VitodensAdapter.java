@@ -1,5 +1,6 @@
 package de.bimalo.homeauto.boundary.viessman;
 
+import de.bimalo.homeauto.boundary.modbus.ModbusClientException;
 import de.bimalo.homeauto.entity.GasHeatingStatus;
 import de.bimalo.homeauto.entity.Temperature;
 import io.quarkus.scheduler.Scheduled;
@@ -11,16 +12,15 @@ import jakarta.inject.Inject;
 
 import java.time.Instant;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
+import org.eclipse.microprofile.faulttolerance.Retry;
 import org.eclipse.microprofile.faulttolerance.Timeout;
 
 @Slf4j
 @ApplicationScoped
 public class VitodensAdapter {
 
-    private final VitodensConfig config;
     private final VitodensModbusClient modbusClient;
 
     private volatile GasHeatingStatus lastKnownStatus;
@@ -37,7 +37,6 @@ public class VitodensAdapter {
     }
 
     VitodensAdapter(VitodensConfig config, VitodensModbusClient modbusClient) {
-        this.config = config;
         this.modbusClient = modbusClient;
     }
 
@@ -67,6 +66,7 @@ public class VitodensAdapter {
         }
     }
 
+    @Retry(maxRetries = 2, delay = 200, retryOn = ModbusClientException.class, abortOn = IllegalArgumentException.class)
     @CircuitBreaker(requestVolumeThreshold = 4, failureRatio = 0.5, delay = 5000, successThreshold = 2)
     @CircuitBreakerName("vitodens-status")
     @Timeout(5000)
@@ -91,6 +91,10 @@ public class VitodensAdapter {
 
     public Optional<GasHeatingStatus> getLastKnownStatus() {
         return Optional.ofNullable(lastKnownStatus);
+    }
+
+    public boolean isConnected() {
+        return modbusClient.isConnected();
     }
 
     /**

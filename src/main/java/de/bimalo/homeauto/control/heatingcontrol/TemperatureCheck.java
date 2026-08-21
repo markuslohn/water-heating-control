@@ -13,7 +13,7 @@ public record TemperatureCheck(Temperature current, Temperature target) {
      * @return true if current temperature is greater than or equal to target temperature
      */
     public boolean targetReached() {
-        return current.getCelsius() >= target.getCelsius();
+        return current.celsius() >= target.celsius();
     }
 
     /**
@@ -22,7 +22,7 @@ public record TemperatureCheck(Temperature current, Temperature target) {
      * @return current temperature in degrees Celsius
      */
     public double currentCelsius() {
-        return current.getCelsius();
+        return current.celsius();
     }
 
     /**
@@ -31,6 +31,6 @@ public record TemperatureCheck(Temperature current, Temperature target) {
      * @return target temperature in degrees Celsius
      */
     public double targetCelsius() {
-        return target.getCelsius();
+        return target.celsius();
     }
 }

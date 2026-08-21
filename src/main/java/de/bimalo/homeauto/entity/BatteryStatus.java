@@ -18,11 +18,21 @@ public record BatteryStatus(
      * Determines the pure solar power surplus available.
      * Only counts actual solar production, not battery discharge.
      *
+     * @param currentHeatingPower power a heating device is currently drawing and
+     *                            which is therefore already included in
+     *                            {@link #consumptionPower()}; excluded from
+     *                            consumption so surplus reflects what is
+     *                            actually free, not artificially reduced by the
+     *                            heating device's own ongoing draw
      * @return Power surplus from solar only (battery discharge is not counted)
      */
-    public Power determineSolarPowerSurplus() {
+    public Power determineSolarPowerSurplus(Power currentHeatingPower) {
+        Power consumptionWithoutHeating = currentHeatingPower.isPositive()
+                ? consumptionPower.reduce(currentHeatingPower)
+                : consumptionPower;
+
         // Base solar surplus: Production - Consumption
-        Power surplusPower = productionPower.reduce(consumptionPower);
+        Power surplusPower = productionPower.reduce(consumptionWithoutHeating);
 
         // If battery is charging, this solar power is not available for other use
         if (batteryPower.isPositive()) {

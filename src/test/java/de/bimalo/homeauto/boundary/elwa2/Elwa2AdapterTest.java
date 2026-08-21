@@ -4,17 +4,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.bimalo.homeauto.boundary.modbus.ModbusClientException;
 import de.bimalo.homeauto.entity.HeatingRodStatus;
 import de.bimalo.homeauto.entity.Power;
 import de.bimalo.homeauto.entity.Temperature;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,9 +38,6 @@ class Elwa2AdapterTest {
     @BeforeEach
     void setUp() {
         service = new Elwa2Adapter(config, modbusClient);
-        // Short enough to satisfy validatePowerCommandTimeout() for any timeout used
-        // below
-        lenient().when(config.keepAliveCheckInterval()).thenReturn(Duration.ofMillis(1));
     }
 
     @Test
@@ -99,53 +93,61 @@ class Elwa2AdapterTest {
     }
 
     @Test
-    void keepHeatingAlive_doesNothingWhenNoPowerRequested() {
-        service.keepHeatingAlive();
+    void stopHeating_writesZeroOnlyOnce_whenCalledRepeatedlyWhileAlreadyStopped() {
+        service.stopHeating();
+        service.stopHeating();
 
-        verify(modbusClient, never()).setPower(org.mockito.ArgumentMatchers.any(Power.class));
+        verify(modbusClient, times(1)).setPower(Power.ZERO);
     }
 
     @Test
-    void keepHeatingAlive_doesNotRefresh_whenElapsedTimeBelowHalfTimeout() {
-        when(modbusClient.readPowerCommandTimeout()).thenReturn(Duration.ofSeconds(60));
-        service.initialize();
+    void adjustHeating_writesZeroOnlyOnce_whenRepeatedlyToldToStop() {
+        service.adjustHeating(Power.ofWatts(500));
+        service.adjustHeating(Power.ZERO);
+        service.adjustHeating(Power.ZERO);
 
-        service.adjustHeating(Power.ofWatts(1000));
-        service.keepHeatingAlive();
-
-        verify(modbusClient, times(1)).setPower(Power.ofWatts(1000));
+        verify(modbusClient, times(1)).setPower(Power.ZERO);
     }
 
     @Test
-    void keepHeatingAlive_refreshes_whenElapsedTimeReachesHalfTimeout() throws InterruptedException {
-        when(modbusClient.readPowerCommandTimeout()).thenReturn(Duration.ofMillis(4));
-        service.initialize();
+    void stopHeating_stillWritesOnFirstCall_evenThoughLastRequestedPowerDefaultsToZero() {
+        // Safety net: a freshly constructed instance must not assume the real
+        // device is already off just because its own tracked state defaults to
+        // zero (e.g. right after an application restart while heating was on).
+        service.stopHeating();
 
-        service.adjustHeating(Power.ofWatts(1000));
-        Thread.sleep(20);
-        service.keepHeatingAlive();
-
-        verify(modbusClient, times(2)).setPower(Power.ofWatts(1000));
+        verify(modbusClient, times(1)).setPower(Power.ZERO);
     }
 
     @Test
-    void initialize_usesFallbackTimeout_whenReadingPowerCommandTimeoutFails() throws InterruptedException {
-        // readPowerCommandTimeout() is now only read once during initialize(); a
-        // failure
-        // there falls back to the configured default instead of failing startup
-        when(modbusClient.readPowerCommandTimeout())
-                .thenThrow(new ModbusClientException("Modbus timeout", "localhost", 502));
-        when(config.powerCommandTimeoutFallback()).thenReturn(Duration.ofMillis(4));
+    void stopHeating_retriesOnNextCall_whenPreviousStopAttemptFailed() {
+        service.adjustHeating(Power.ofWatts(500));
+        doThrow(new RuntimeException("write failed")).doNothing().when(modbusClient).setPower(Power.ZERO);
 
-        assertDoesNotThrow(() -> service.initialize());
+        assertThrows(RuntimeException.class, () -> service.stopHeating());
+        // The failed write must not be treated as "already stopped" - the device
+        // is presumably still heating at 500W, so a second attempt must reach the
+        // Modbus client again instead of being skipped by the idempotency guard.
+        service.stopHeating();
 
-        // The fallback value must actually be used by keepHeatingAlive(), not just
-        // avoid
-        // throwing during initialize()
-        service.adjustHeating(Power.ofWatts(1000));
-        Thread.sleep(20);
-        service.keepHeatingAlive();
+        verify(modbusClient, times(2)).setPower(Power.ZERO);
+    }
 
-        verify(modbusClient, times(2)).setPower(Power.ofWatts(1000));
+    @Test
+    void shutdown_stopsHeatingRodAndShutsDownModbusClient() {
+        service.shutdown();
+
+        verify(modbusClient).setPower(Power.ZERO);
+        verify(modbusClient).shutdown();
+    }
+
+    @Test
+    void shutdown_stillShutsDownModbusClient_whenStoppingHeatingFails() {
+        service.adjustHeating(Power.ofWatts(500));
+        doThrow(new RuntimeException("stop failed")).when(modbusClient).setPower(Power.ZERO);
+
+        assertDoesNotThrow(() -> service.shutdown());
+
+        verify(modbusClient).shutdown();
     }
 }

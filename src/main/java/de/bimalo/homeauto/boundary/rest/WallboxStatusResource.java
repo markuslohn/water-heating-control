@@ -6,8 +6,8 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.ServiceUnavailableException;
 import jakarta.ws.rs.core.MediaType;
+import java.time.Clock;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -18,23 +18,32 @@ import lombok.extern.slf4j.Slf4j;
 @Produces(MediaType.APPLICATION_JSON)
 public class WallboxStatusResource {
 
+    private final GoEchargerAdapter goEchargerAdapter;
+    private final RestStatusConfig restStatusConfig;
+
     @Inject
-    GoEchargerAdapter goEchargerAdapter;
+    public WallboxStatusResource(GoEchargerAdapter goEchargerAdapter, RestStatusConfig restStatusConfig) {
+        this.goEchargerAdapter = goEchargerAdapter;
+        this.restStatusConfig = restStatusConfig;
+    }
 
     /**
-     * Gets the current wallbox charging status.
+     * Gets the current wallbox charging status. Falls back to the last known
+     * status if the live read fails, marked {@code stale=true} - unless that
+     * status is itself too old, in which case this returns 503.
      *
      * @return current wallbox status including charging state and charging power
      */
     @GET
     @Path("/status")
-    public WallboxStatus getStatus() {
+    public WallboxStatusResponse getStatus() {
         log.debug("REST: Getting wallbox status");
-        try {
-            return goEchargerAdapter.readStatus();
-        } catch (RuntimeException e) {
-            return goEchargerAdapter.getLastKnownStatus()
-                    .orElseThrow(ServiceUnavailableException::new);
-        }
+        StatusFallback.ResolvedStatus<WallboxStatus> resolved = StatusFallback.resolve(
+                goEchargerAdapter::readStatus,
+                goEchargerAdapter::getLastKnownStatus,
+                WallboxStatus::measuredAt,
+                restStatusConfig.maxCacheAge(),
+                Clock.systemUTC());
+        return WallboxStatusResponse.of(resolved.status(), resolved.stale());
     }
 }

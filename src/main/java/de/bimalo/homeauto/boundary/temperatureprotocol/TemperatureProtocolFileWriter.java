@@ -41,8 +41,8 @@ public class TemperatureProtocolFileWriter {
         Path file = fileFor(LocalDate.ofInstant(entry.getTimestamp(), ZoneOffset.UTC));
         String line = String.format(Locale.ROOT, "%s;%.1f;%.1f%s",
                 entry.getTimestamp(),
-                entry.getHeatingRodTemperature().getCelsius(),
-                entry.getGasHeatingTemperature().getCelsius(),
+                entry.getHeatingRodTemperature().celsius(),
+                entry.getGasHeatingTemperature().celsius(),
                 System.lineSeparator());
 
         try {

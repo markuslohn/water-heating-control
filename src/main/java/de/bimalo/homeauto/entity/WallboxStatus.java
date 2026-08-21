@@ -4,7 +4,6 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 
-import de.bimalo.homeauto.boundary.goecharger.CarStatus;
 import lombok.Builder;
 
 /**

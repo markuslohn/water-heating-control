@@ -29,10 +29,13 @@ class SurplusPowerSmoother {
     /**
      * Determines the heating power that should actually be applied.
      *
-     * @param instantSurplusTarget the freshly computed, surplus-based target power
-     * @param currentHeatingPower  the heating power currently applied
-     * @param smoothingWindow      time window over which upward adjustments are averaged
-     * @param minChangeThresholdWatts minimum power difference (in watts) required to apply a change
+     * @param instantSurplusTarget    the freshly computed, surplus-based target
+     *                                power
+     * @param currentHeatingPower     the heating power currently applied
+     * @param smoothingWindow         time window over which upward adjustments are
+     *                                averaged
+     * @param minChangeThresholdWatts minimum power difference (in watts) required
+     *                                to apply a change
      * @return the heating power to apply; equals {@code currentHeatingPower} if no
      *         adjustment should be made
      */
@@ -51,7 +54,7 @@ class SurplusPowerSmoother {
                 ? candidate.reduce(currentHeatingPower)
                 : currentHeatingPower.reduce(candidate);
 
-        return delta.getWatts() < minChangeThresholdWatts ? currentHeatingPower : candidate;
+        return delta.watts() < minChangeThresholdWatts ? currentHeatingPower : candidate;
     }
 
     private void pruneOlderThan(Instant cutoff) {
@@ -63,9 +66,13 @@ class SurplusPowerSmoother {
     private Power average() {
         long sum = 0;
         for (Sample sample : samples) {
-            sum += sample.power().getWatts();
+            sum += sample.power().watts();
         }
         return Power.ofWatts(Math.round(sum / (double) samples.size()));
+    }
+
+    void reset() {
+        samples.clear();
     }
 
     private record Sample(Instant timestamp, Power power) {

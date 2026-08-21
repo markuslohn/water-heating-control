@@ -1,7 +1,7 @@
 package de.bimalo.homeauto.boundary.rest;
 
-import de.bimalo.homeauto.control.manualwaterheating.ManualWaterHeatingService;
-import de.bimalo.homeauto.entity.ManualWaterHeatingStatus;
+import de.bimalo.homeauto.control.heatingcontrol.HeatingControlService;
+import de.bimalo.homeauto.entity.ManualHeatingState;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
@@ -18,8 +18,12 @@ import lombok.extern.slf4j.Slf4j;
 @Produces(MediaType.APPLICATION_JSON)
 public class ManualWaterHeatingResource {
 
+    private final HeatingControlService heatingControlService;
+
     @Inject
-    ManualWaterHeatingService manualWaterHeatingService;
+    public ManualWaterHeatingResource(HeatingControlService heatingControlService) {
+        this.heatingControlService = heatingControlService;
+    }
 
     /**
      * Gets the current manual water heating status.
@@ -30,7 +34,7 @@ public class ManualWaterHeatingResource {
     @Path("/status")
     public ManualWaterHeatingStatus getStatus() {
         log.debug("REST: Getting manual water heating status");
-        return manualWaterHeatingService.getStatus();
+        return toStatus(heatingControlService.getManualStatus());
     }
 
     /**
@@ -40,8 +44,8 @@ public class ManualWaterHeatingResource {
     @Path("/start")
     public ManualWaterHeatingStatus start() {
         log.info("REST: Starting manual water heating mode");
-        manualWaterHeatingService.activate();
-        return manualWaterHeatingService.getStatus();
+        heatingControlService.activateManualHeating();
+        return toStatus(heatingControlService.getManualStatus());
     }
 
     /**
@@ -51,7 +55,14 @@ public class ManualWaterHeatingResource {
     @Path("/stop")
     public ManualWaterHeatingStatus stop() {
         log.info("REST: Stopping manual water heating mode");
-        manualWaterHeatingService.deactivate();
-        return manualWaterHeatingService.getStatus();
+        heatingControlService.deactivateManualHeating();
+        return toStatus(heatingControlService.getManualStatus());
+    }
+
+    private static ManualWaterHeatingStatus toStatus(ManualHeatingState state) {
+        return ManualWaterHeatingStatus.builder()
+                .active(state.active())
+                .source(state.source())
+                .build();
     }
 }

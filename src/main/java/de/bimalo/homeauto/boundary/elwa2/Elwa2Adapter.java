@@ -3,18 +3,17 @@ package de.bimalo.homeauto.boundary.elwa2;
 import de.bimalo.homeauto.boundary.modbus.ModbusClientException;
 import de.bimalo.homeauto.entity.HeatingRodStatus;
 import de.bimalo.homeauto.entity.Power;
-import io.quarkus.scheduler.Scheduled;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
+import org.eclipse.microprofile.faulttolerance.Retry;
 import org.eclipse.microprofile.faulttolerance.Timeout;
 
 /**
@@ -27,16 +26,18 @@ import org.eclipse.microprofile.faulttolerance.Timeout;
 public class Elwa2Adapter {
 
     private final Elwa2ModbusClient modbusClient;
-    private Elwa2Config config;
 
     private volatile HeatingRodStatus lastKnownStatus;
 
-    private volatile Duration powerCommandTimeout;
-
-    // Tracks the currently requested heating power and when it was last written,
-    // used to keep the request alive within the ELWA2's own power timeout.
+    // Tracks the currently requested heating power, used for idempotency
+    // (avoid redundant writes of the same value).
     private volatile Power lastRequestedPower = Power.ZERO;
-    private volatile Instant lastPowerRequestAt = Instant.EPOCH;
+
+    // Whether a power command has been sent since this instance started; lets
+    // stopHeating() skip a redundant zero-write instead of relying purely on
+    // lastRequestedPower, which defaults to zero regardless of the actual device
+    // state on startup.
+    private volatile boolean powerRequestSent = false;
 
     @Inject
     public Elwa2Adapter(Elwa2Config config) {
@@ -44,14 +45,12 @@ public class Elwa2Adapter {
     }
 
     Elwa2Adapter(Elwa2Config config, Elwa2ModbusClient modbusClient) {
-        this.config = config;
         this.modbusClient = modbusClient;
     }
 
     @PostConstruct
     public void initialize() {
         modbusClient.initialize();
-        powerCommandTimeout = determinePowerCommandTimeout();
     }
 
     @PreDestroy
@@ -67,6 +66,7 @@ public class Elwa2Adapter {
         }
     }
 
+    @Retry(maxRetries = 2, delay = 200, retryOn = ModbusClientException.class, abortOn = IllegalArgumentException.class)
     @CircuitBreaker(requestVolumeThreshold = 4, failureRatio = 0.5, delay = 5000, successThreshold = 2)
     @Timeout(6000)
     public HeatingRodStatus readStatus() {
@@ -74,7 +74,6 @@ public class Elwa2Adapter {
                 modbusClient.readTemperature1(),
                 modbusClient.readTargetTemperature(),
                 modbusClient.readPower(),
-                modbusClient.readStatus(),
                 Instant.now());
 
         lastKnownStatus = status;
@@ -85,21 +84,27 @@ public class Elwa2Adapter {
         return Optional.ofNullable(lastKnownStatus);
     }
 
+    public boolean isConnected() {
+        return modbusClient.isConnected();
+    }
+
     public synchronized void stopHeating() {
         Power previousPower = lastRequestedPower;
 
-        // before modus write deactivate keep-alive
-        lastRequestedPower = Power.ZERO;
+        if (powerRequestSent && previousPower.equals(Power.ZERO)) {
+            return;
+        }
 
         try {
             modbusClient.setPower(Power.ZERO);
-            lastPowerRequestAt = Instant.now();
+            lastRequestedPower = Power.ZERO;
+            powerRequestSent = true;
 
             if (previousPower.isPositive()) {
                 log.info("Heating stopped; previous request was {}", previousPower);
             }
         } catch (RuntimeException ex) {
-            log.error("Failed to send stop command to ELWA2; keep-alive remains disabled", ex);
+            log.error("Failed to send stop command to ELWA2", ex);
             throw ex;
         }
     }
@@ -124,64 +129,10 @@ public class Elwa2Adapter {
 
         modbusClient.setPower(power);
         lastRequestedPower = power;
-        lastPowerRequestAt = Instant.now();
+        powerRequestSent = true;
 
         if (!power.equals(previousPower)) {
             log.info("Heating power changed from {} to {}", previousPower, power);
-        }
-    }
-
-    /**
-     * Refreshes the heating power request before the ELWA2's own power timeout
-     * (see {@link #readPowerTimeout()}) elapses; otherwise the ELWA2 reverts to
-     * standby on its own. Runs independently of any control loop so callers only
-     * need to call {@link #adjustHeating(Power)} once. Does nothing while no
-     * heating power is requested.
-     */
-    @Scheduled(every = "{elwa2.keep-alive-check-interval}", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
-    public synchronized void keepHeatingAlive() {
-        if (!lastRequestedPower.isPositive()) {
-            return;
-        }
-        try {
-            Duration elapsed = Duration.between(lastPowerRequestAt, Instant.now());
-            if (elapsed.compareTo(powerCommandTimeout.dividedBy(2)) >= 0) {
-                adjustHeating(lastRequestedPower);
-            }
-        } catch (RuntimeException ex) {
-            log.error("Failed to refresh heating power request for ELWA2", ex);
-        }
-    }
-
-    private Duration determinePowerCommandTimeout() {
-        try {
-            Duration timeout = modbusClient.readPowerCommandTimeout();
-            validatePowerCommandTimeout(timeout);
-
-            log.info("ELWA2 power command timeout is {}", timeout);
-            return timeout;
-        } catch (ModbusClientException e) {
-            Duration fallback = config.powerCommandTimeoutFallback();
-
-            log.warn(
-                    "Could not read ELWA2 power command timeout; using configured fallback {}",
-                    fallback,
-                    e);
-
-            return fallback;
-        }
-    }
-
-    private void validatePowerCommandTimeout(Duration timeout) {
-        if (timeout == null || timeout.isZero() || timeout.isNegative()) {
-            throw new IllegalArgumentException(
-                    "ELWA2 power command timeout must be positive");
-        }
-
-        if (config.keepAliveCheckInterval().compareTo(timeout.dividedBy(2)) >= 0) {
-            throw new IllegalStateException(
-                    "ELWA2 keep-alive interval must be shorter than half "
-                            + "the power command timeout");
         }
     }
 }

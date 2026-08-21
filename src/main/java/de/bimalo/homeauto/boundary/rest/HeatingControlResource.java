@@ -11,8 +11,8 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.ServiceUnavailableException;
 import jakarta.ws.rs.core.MediaType;
+import java.time.Clock;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -23,14 +23,24 @@ import lombok.extern.slf4j.Slf4j;
 @Produces(MediaType.APPLICATION_JSON)
 public class HeatingControlResource {
 
-    @Inject
-    Elwa2Adapter elwa2Adapter;
+    private final Elwa2Adapter elwa2Adapter;
+    private final HeatingControlService heatingControlService;
+    private final RestStatusConfig restStatusConfig;
 
     @Inject
-    HeatingControlService heatingControlService;
+    public HeatingControlResource(
+            Elwa2Adapter elwa2Adapter,
+            HeatingControlService heatingControlService,
+            RestStatusConfig restStatusConfig) {
+        this.elwa2Adapter = elwa2Adapter;
+        this.heatingControlService = heatingControlService;
+        this.restStatusConfig = restStatusConfig;
+    }
 
     /**
-     * Gets the current heating rod status.
+     * Gets the current heating rod status. Falls back to the last known
+     * status if the live read fails, marked {@code stale=true} - unless that
+     * status is itself too old, in which case this returns 503.
      *
      * @return current heating status including active state, power, temperatures
      *         and manual mode
@@ -40,20 +50,21 @@ public class HeatingControlResource {
     public HeatingStatus getStatus() {
         log.debug("REST: Getting heating status");
 
-        HeatingRodStatus measurements;
-        try {
-            measurements = elwa2Adapter.readStatus();
-        } catch (RuntimeException ex) {
-            measurements = elwa2Adapter.getLastKnownStatus().orElseThrow(ServiceUnavailableException::new);
-        }
+        StatusFallback.ResolvedStatus<HeatingRodStatus> resolved = StatusFallback.resolve(
+                elwa2Adapter::readStatus,
+                elwa2Adapter::getLastKnownStatus,
+                HeatingRodStatus::measuredAt,
+                restStatusConfig.maxCacheAge(),
+                Clock.systemUTC());
+        HeatingRodStatus status = resolved.status();
 
-        Power power = measurements.currentPower();
-        Temperature currentTemp = measurements.currentTemperature();
-        Temperature targetTemp = measurements.targetTemperature();
+        Power power = status.currentPower();
+        Temperature currentTemp = status.currentTemperature();
+        Temperature targetTemp = status.targetTemperature();
         Season currentSeason = heatingControlService.getCurrentSeason();
 
         return HeatingStatus.builder()
-                .active(power.getWatts() > 0)
+                .active(power.watts() > 0)
                 .power(power)
                 .currentTemperature(currentTemp)
                 .targetTemperature(targetTemp)
@@ -61,6 +72,8 @@ public class HeatingControlResource {
                 .season(currentSeason.getDisplayName())
                 .seasonEmoji(currentSeason.getEmoji())
                 .seasonEnabled(heatingControlService.isCurrentSeasonEnabled())
+                .stale(resolved.stale())
+                .measuredAt(status.measuredAt())
                 .build();
     }
 }

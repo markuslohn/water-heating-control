@@ -7,6 +7,7 @@ package de.bimalo.homeauto.entity;
 public enum HeatingSource {
     PV,
     BATTERY,
+    PV_AND_BATTERY,
     GAS,
     NONE
 }

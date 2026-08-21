@@ -94,6 +94,6 @@ public final class Elwa2ModbusClient extends AbstractModbusClient {
             throw new IllegalArgumentException(
                     String.format("Power must be between 0 and %d W, but was: %s", MAX_POWER_WATTS, power));
         }
-        this.writeUnsignedInteger(Elwa2Register.POWER.getAddress(), (int) power.getWatts());
+        this.writeUnsignedInteger(Elwa2Register.POWER.getAddress(), (int) power.watts());
     }
 }

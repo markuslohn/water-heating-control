@@ -1,5 +1,6 @@
 package de.bimalo.homeauto.boundary.e3dc;
 
+import de.bimalo.homeauto.boundary.modbus.ModbusClientException;
 import de.bimalo.homeauto.entity.BatteryStatus;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -11,6 +12,7 @@ import java.time.Instant;
 import java.util.Optional;
 
 import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
+import org.eclipse.microprofile.faulttolerance.Retry;
 import org.eclipse.microprofile.faulttolerance.Timeout;
 
 /**
@@ -45,6 +47,7 @@ public class E3dcAdapter {
         modbusClient.shutdown();
     }
 
+    @Retry(maxRetries = 2, delay = 200, retryOn = ModbusClientException.class, abortOn = IllegalArgumentException.class)
     @CircuitBreaker(requestVolumeThreshold = 4, failureRatio = 0.5, delay = 5000, successThreshold = 2)
     @Timeout(6000)
     public BatteryStatus readStatus() {
@@ -64,6 +67,10 @@ public class E3dcAdapter {
 
     public Optional<BatteryStatus> getLastKnownStatus() {
         return Optional.ofNullable(lastKnownStatus);
+    }
+
+    public boolean isConnected() {
+        return modbusClient.isConnected();
     }
 
 }

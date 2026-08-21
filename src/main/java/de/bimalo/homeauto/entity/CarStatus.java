@@ -1,4 +1,4 @@
-package de.bimalo.homeauto.boundary.goecharger;
+package de.bimalo.homeauto.entity;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -6,7 +6,8 @@ import lombok.Getter;
 
 /**
  * Status of the vehicle connected to the go-eCharger charging station.
- * Corresponds to the value of register {@link GoEchargerRegister#CAR_STATE}.
+ * Corresponds to the value of register
+ * {@link de.bimalo.homeauto.boundary.goecharger.GoEchargerRegister#CAR_STATE}.
  */
 @Getter
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
