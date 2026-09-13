@@ -29,11 +29,11 @@ import de.bimalo.homeauto.entity.Percentage;
 import de.bimalo.homeauto.entity.Power;
 import de.bimalo.homeauto.entity.Season;
 import de.bimalo.homeauto.entity.Temperature;
+import java.time.Clock;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -64,11 +64,20 @@ class HeatingControlServiceTest {
     @Mock
     private ManualWaterHeatingPolicy manualWaterHeatingPolicy;
 
-    @InjectMocks
     private HeatingControlService heatingControlService;
 
     @BeforeEach
     void setUp() {
+        // HeatingControlService has a second, package-private constructor taking a
+        // Clock (for this test); Mockito's @InjectMocks would pick that constructor
+        // over the @Inject one and inject a null Clock, so it is wired explicitly
+        // here instead. A real system clock keeps the season-related assertions
+        // below (which independently call Season.current()) consistent with what
+        // the service computes.
+        heatingControlService = new HeatingControlService(
+                config, e3dcAdapter, elwa2Adapter, vitodensAdapter,
+                automaticPolicy, manualWaterHeatingPolicy, Clock.systemDefaultZone());
+
         lenient().when(config.enabled()).thenReturn(true);
         lenient().when(config.maxHeatingPower()).thenReturn(2900);
         lenient().when(manualWaterHeatingPolicy.getState()).thenReturn(ManualHeatingState.inactive());

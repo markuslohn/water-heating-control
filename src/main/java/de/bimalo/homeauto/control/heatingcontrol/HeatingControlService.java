@@ -14,6 +14,7 @@ import de.bimalo.homeauto.entity.Season;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import java.time.Clock;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.extern.slf4j.Slf4j;
 
@@ -33,6 +34,7 @@ public class HeatingControlService {
 
     private final AutomaticHeatingPolicy automaticPolicy;
     private final ManualWaterHeatingPolicy manualPolicy;
+    private final Clock clock;
 
     // Runtime override for battery priority (resets at midnight)
     private final AtomicBoolean batteryPriorityRuntimeOverride = new AtomicBoolean(false);
@@ -45,12 +47,25 @@ public class HeatingControlService {
             VitodensAdapter vitodensAdapter,
             AutomaticHeatingPolicy automaticPolicy,
             ManualWaterHeatingPolicy manualPolicy) {
+        this(config, e3dcAdapter, elwa2Adapter, vitodensAdapter, automaticPolicy, manualPolicy,
+                Clock.systemDefaultZone());
+    }
+
+    HeatingControlService(
+            HeatingControlConfig config,
+            E3dcAdapter e3dcAdapter,
+            Elwa2Adapter elwa2Adapter,
+            VitodensAdapter vitodensAdapter,
+            AutomaticHeatingPolicy automaticPolicy,
+            ManualWaterHeatingPolicy manualPolicy,
+            Clock clock) {
         this.config = config;
         this.e3dcAdapter = e3dcAdapter;
         this.elwa2Adapter = elwa2Adapter;
         this.vitodensAdapter = vitodensAdapter;
         this.automaticPolicy = automaticPolicy;
         this.manualPolicy = manualPolicy;
+        this.clock = clock;
     }
 
     /**
@@ -102,6 +117,7 @@ public class HeatingControlService {
      */
     @Scheduled(every = "50s", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
     public synchronized void controlManualHeating() {
+        log.debug("ManualHeatingControl");
         if (!manualPolicy.getState().active()) {
             return;
         }
@@ -176,6 +192,7 @@ public class HeatingControlService {
      * Checks solar surplus and temperature to control the heating rod.
      */
     private synchronized void controlAutomaticHeating() {
+        log.debug("controlAutomaticHeating");
         if (!shouldControlHeating()) {
             return;
         }
@@ -184,6 +201,8 @@ public class HeatingControlService {
             HeatingRodStatus rodStatus = elwa2Adapter.readStatus();
             BatteryStatus batteryStatus = e3dcAdapter.readStatus();
             HeatingDecision decision = automaticPolicy.decide(rodStatus, batteryStatus, isBatteryPriorityActive());
+            
+            log.debug(decision.toString());
 
             applyAutomaticDecision(decision);
 
@@ -301,7 +320,7 @@ public class HeatingControlService {
      * @return the current season
      */
     public Season getCurrentSeason() {
-        return Season.current();
+        return Season.current(clock);
     }
 
     /**

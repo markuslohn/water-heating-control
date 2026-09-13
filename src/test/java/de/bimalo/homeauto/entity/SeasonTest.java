@@ -3,7 +3,10 @@ package de.bimalo.homeauto.entity;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.Month;
+import java.time.ZoneOffset;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -80,5 +83,14 @@ class SeasonTest {
         // Current season depends on the actual date, so we just verify it returns a valid season
         Season current = Season.current();
         assertEquals(current, Season.fromMonth(java.time.LocalDate.now().getMonthValue()));
+    }
+
+    @Test
+    void testCurrentWithClock_ShouldUseClocksDate() {
+        Clock january = Clock.fixed(Instant.parse("2024-01-15T10:00:00Z"), ZoneOffset.UTC);
+        Clock july = Clock.fixed(Instant.parse("2024-07-15T10:00:00Z"), ZoneOffset.UTC);
+
+        assertEquals(Season.WINTER, Season.current(january));
+        assertEquals(Season.SUMMER, Season.current(july));
     }
 }
