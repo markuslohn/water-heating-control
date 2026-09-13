@@ -24,17 +24,22 @@ import org.eclipse.microprofile.health.Readiness;
 @Readiness
 public class ModbusConnectivityHealthCheck implements HealthCheck {
 
-    @Inject
-    E3dcAdapter e3dcAdapter;
+    private final E3dcAdapter e3dcAdapter;
+    private final Elwa2Adapter elwa2Adapter;
+    private final VitodensAdapter vitodensAdapter;
+    private final GoEchargerAdapter goEchargerAdapter;
 
     @Inject
-    Elwa2Adapter elwa2Adapter;
-
-    @Inject
-    VitodensAdapter vitodensAdapter;
-
-    @Inject
-    GoEchargerAdapter goEchargerAdapter;
+    public ModbusConnectivityHealthCheck(
+            E3dcAdapter e3dcAdapter,
+            Elwa2Adapter elwa2Adapter,
+            VitodensAdapter vitodensAdapter,
+            GoEchargerAdapter goEchargerAdapter) {
+        this.e3dcAdapter = e3dcAdapter;
+        this.elwa2Adapter = elwa2Adapter;
+        this.vitodensAdapter = vitodensAdapter;
+        this.goEchargerAdapter = goEchargerAdapter;
+    }
 
     @Override
     public HealthCheckResponse call() {

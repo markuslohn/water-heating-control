@@ -10,8 +10,12 @@ import jakarta.inject.Inject;
 @Liveness
 public class VersionHealthCheck implements HealthCheck {
 
+    private final VersionService versionService;
+
     @Inject
-    VersionService versionService;
+    public VersionHealthCheck(VersionService versionService) {
+        this.versionService = versionService;
+    }
 
     @Override
     public HealthCheckResponse call() {

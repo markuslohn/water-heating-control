@@ -12,8 +12,12 @@ import jakarta.inject.Singleton;
 @Singleton
 public class SpringDisabledPredicate implements SkipPredicate {
 
+    private final HeatingControlConfig config;
+
     @Inject
-    HeatingControlConfig config;
+    public SpringDisabledPredicate(HeatingControlConfig config) {
+        this.config = config;
+    }
 
     @Override
     public boolean test(ScheduledExecution execution) {
