@@ -1,9 +1,11 @@
 {
 	"name": "Java Development",
+
 	"build": {
 		"context": ".",
 		"dockerfile": "Dockerfile"
 	},
+
 	"features": {
 		"ghcr.io/devcontainers/features/java:1": {
 			"version": "21",
@@ -14,13 +16,14 @@
 		"ghcr.io/devcontainers/features/git:1": {},
 		"ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
 	},
-	"mounts": [
-		"source=${localEnv:HOME}/.claude,target=/home/vscode/.claude,type=bind",
-		"source=${localWorkspaceFolder}/../CLAUDE.md,target=/workspaces/CLAUDE.md,type=bind,readonly"
-	],
+
+	"workspaceMount": "",
+	"workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+
 	"containerEnv": {
 		"CLAUDE_CONFIG_DIR": "/home/vscode/.claude"
 	},
+
 	"customizations": {
 		"vscode": {
 			"extensions": [
@@ -30,16 +33,25 @@
 			]
 		}
 	},
-	// Use 'forwardPorts' to make a list of ports inside the container available locally
+
 	"forwardPorts": [
 		8080,
 		8081,
 		5005
 	],
+
 	"runArgs": [
-		"--tmpfs=/tmp:exec,mode=1777"
+		"--tmpfs=/tmp:exec,mode=1777",
+
+		"--volume=${localWorkspaceFolder}:/workspaces/${localWorkspaceFolderBasename}:Z",
+
+		"--volume=${localEnv:HOME}/.claude:/home/vscode/.claude:Z",
+
+		"--volume=${localWorkspaceFolder}/../CLAUDE.md:/workspaces/CLAUDE.md:ro,Z"
 	],
+
+
 	"remoteUser": "vscode",
-	//"postStartCommand": "sudo chmod 1777 /tmp",
+
 	"postCreateCommand": "echo 'Java Development Environment ready!'"
 }

@@ -7,17 +7,17 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum HotWaterStatus {
 
-    OFF(0, "Warmwasser aus"),
-    ONLY_HOT_WATER(1, "Nur Warmwasserbetrieb"),
-    HEATING_AND_HOT_WATER(2, "Heizung und Warmwasserbetrieb"),
-    CHIMNEY_SWEEPING(3, "Kaminfegerbetrieb"),
-    TEST_MODE(4, "Testbetrieb"),
-    EXTERNAL_TEMPERATURE_CONTROL_SHOULD(5, "Externer Temperatur-Sollwert"),
-    EXTERNAL_MODULATION_SHOULD(6, "Externe Modulation-Sollwert"),
-    HYGIENE(7, "Hygienebetrieb"),
-    SOLAR_POWERED(8, "Solarbetrieb"),
-    AUTOMATIC(9, "Automatikbetrieb"),
-    UNKNOWN(-1, "Unbekannter Status");
+    OFF(0, "Hot water off"),
+    ONLY_HOT_WATER(1, "Hot water only mode"),
+    HEATING_AND_HOT_WATER(2, "Heating and hot water mode"),
+    CHIMNEY_SWEEPING(3, "Chimney sweep mode"),
+    TEST_MODE(4, "Test mode"),
+    EXTERNAL_TEMPERATURE_CONTROL_SHOULD(5, "External temperature setpoint"),
+    EXTERNAL_MODULATION_SHOULD(6, "External modulation setpoint"),
+    HYGIENE(7, "Hygiene mode"),
+    SOLAR_POWERED(8, "Solar mode"),
+    AUTOMATIC(9, "Automatic mode"),
+    UNKNOWN(-1, "Unknown status");
 
     private final int value;
     private final String description;

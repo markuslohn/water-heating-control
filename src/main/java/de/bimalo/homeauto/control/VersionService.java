@@ -1,17 +1,15 @@
 package de.bimalo.homeauto.control;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.Properties;
-
-import org.eclipse.microprofile.config.ConfigProvider;
-
 import de.bimalo.homeauto.entity.VersionInfo;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Properties;
 import lombok.extern.slf4j.Slf4j;
+import org.eclipse.microprofile.config.ConfigProvider;
 
 @Slf4j
 @ApplicationScoped
@@ -51,10 +49,10 @@ public class VersionService {
                 ========================================
                 Application Version Information
                 ----------------------------------------
-                Version:    %s
-                Git Commit: %s
-                Git Branch: %s
-                Build Time: %s
+                Version:    {}
+                Git Commit: {}
+                Git Branch: {}
+                Build Time: {}
                 ========================================
                 """,
                 versionInfo.version(),

@@ -1,6 +1,7 @@
 package de.bimalo.homeauto.boundary.goecharger;
 
 import de.bimalo.homeauto.boundary.modbus.AbstractModbusClient;
+import de.bimalo.homeauto.entity.CarStatus;
 import de.bimalo.homeauto.entity.DeviceInfo;
 import de.bimalo.homeauto.entity.Power;
 import lombok.extern.slf4j.Slf4j;

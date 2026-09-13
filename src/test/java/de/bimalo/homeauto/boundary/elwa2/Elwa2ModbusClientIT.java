@@ -36,7 +36,7 @@ class Elwa2ModbusClientIT {
         System.out.println("Status: " + client.readStatus());
         System.out.println("Power: " + client.readPower());
         System.out.println("Max Power: " + client.readMaxPower());
-        System.out.println("Power Timeout: " + client.readPowerTimeout());
+        System.out.println("Power Timeout: " + client.readPowerCommandTimeout());
 
         // client.setPower(Power.ofWatts(1300));
 

@@ -14,8 +14,7 @@ public final class Elwa2ModbusClient extends AbstractModbusClient {
     /**
      * Maximum power supported by the ELWA2 heating rod in watts.
      */
-    public static final int MAX_POWER_WATTS = 3200;
-
+    public static final int MAX_POWER_WATTS = 3000;
     private static final Power MAX_POWER = Power.ofWatts(MAX_POWER_WATTS);
 
     public Elwa2ModbusClient(String host, int port) {
@@ -52,18 +51,20 @@ public final class Elwa2ModbusClient extends AbstractModbusClient {
     public Temperature readTemperature1() {
         Elwa2Register register = Elwa2Register.TEMP_1;
         int rawValue = this.readUnsignedInteger(register.getAddress());
-        return Temperature.ofCelsius(rawValue * register.getScaleFactor());
+        double temperature = scaleReadValue(rawValue, register.getScaleFactor());
+        return Temperature.ofCelsius(temperature);
     }
 
     public Temperature readTargetTemperature() {
         Elwa2Register register = Elwa2Register.TARGET_TEMP;
         int rawValue = this.readUnsignedInteger(register.getAddress());
-        return Temperature.ofCelsius(rawValue * register.getScaleFactor());
+        double temperature = scaleReadValue(rawValue, register.getScaleFactor());
+        return Temperature.ofCelsius(temperature);
     }
 
-    public Elwa2Status readStatus() {
+    public Elwa2OperatingStatus readStatus() {
         int rawValue = this.readUnsignedInteger(Elwa2Register.STATUS.getAddress());
-        return Elwa2Status.fromValue(rawValue);
+        return Elwa2OperatingStatus.fromValue(rawValue);
     }
 
     public Power readPower() {
@@ -74,7 +75,7 @@ public final class Elwa2ModbusClient extends AbstractModbusClient {
         return Power.ofWatts(this.readUnsignedInteger(Elwa2Register.MAX_POWER.getAddress()));
     }
 
-    public Duration readPowerTimeout() {
+    public Duration readPowerCommandTimeout() {
         return Duration.ofSeconds(this.readUnsignedInteger(Elwa2Register.POWER_TIMEOUT.getAddress()));
     }
 
@@ -92,6 +93,6 @@ public final class Elwa2ModbusClient extends AbstractModbusClient {
             throw new IllegalArgumentException(
                     String.format("Power must be between 0 and %d W, but was: %s", MAX_POWER_WATTS, power));
         }
-        this.writeUnsignedInteger(Elwa2Register.POWER.getAddress(), (int) power.getWatts());
+        this.writeUnsignedInteger(Elwa2Register.POWER.getAddress(), (int) power.watts());
     }
 }

@@ -1,6 +1,6 @@
 package de.bimalo.homeauto.boundary.rest;
 
-import de.bimalo.homeauto.control.battery.BatteryStorageService;
+import de.bimalo.homeauto.boundary.e3dc.E3dcAdapter;
 import de.bimalo.homeauto.control.heatingcontrol.HeatingControlService;
 import de.bimalo.homeauto.entity.BatteryStatus;
 import jakarta.inject.Inject;
@@ -11,6 +11,7 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import java.time.Clock;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -21,22 +22,40 @@ import lombok.extern.slf4j.Slf4j;
 @Produces(MediaType.APPLICATION_JSON)
 public class BatteryStatusResource {
 
-    @Inject
-    BatteryStorageService batteryStorageService;
+    private final E3dcAdapter e3dcAdapter;
+    private final HeatingControlService heatingControlService;
+    private final RestStatusConfig restStatusConfig;
 
     @Inject
-    HeatingControlService heatingControlService;
+    public BatteryStatusResource(
+            E3dcAdapter e3dcAdapter,
+            HeatingControlService heatingControlService,
+            RestStatusConfig restStatusConfig) {
+        this.e3dcAdapter = e3dcAdapter;
+        this.heatingControlService = heatingControlService;
+        this.restStatusConfig = restStatusConfig;
+    }
 
     /**
      * Gets the current battery storage status.
      *
-     * @return current battery status including production, consumption, battery power, grid power and SOC
+     * @return current battery status including production, consumption, battery
+     *         power, grid power and SOC. Falls back to the last known status if
+     *         the live read fails, marked {@code stale=true} - unless that
+     *         status is itself too old (see {@code reststatus.max-cache-age}),
+     *         in which case this returns 503.
      */
     @GET
     @Path("/status")
-    public BatteryStatus getStatus() {
+    public BatteryStatusResponse getStatus() {
         log.debug("REST: Getting battery status");
-        return batteryStorageService.getCurrentStatus();
+        StatusFallback.ResolvedStatus<BatteryStatus> resolved = StatusFallback.resolve(
+                e3dcAdapter::readStatus,
+                e3dcAdapter::getLastKnownStatus,
+                BatteryStatus::measuredAt,
+                restStatusConfig.maxCacheAge(),
+                Clock.systemUTC());
+        return BatteryStatusResponse.of(resolved.status(), resolved.stale());
     }
 
     /**
@@ -68,16 +87,20 @@ public class BatteryStatusResource {
         log.info("REST: Battery priority override requested: disabled={}", disabled);
 
         try {
-            heatingControlService.setBatteryPriorityOverride(disabled);
+            if (disabled) {
+                heatingControlService.disableBatteryPriorityOverride();
+            } else {
+                heatingControlService.enableBatteryPriorityOverride();
+            }
             boolean active = heatingControlService.isBatteryPriorityActive();
 
             return Response.ok()
-                    .entity(String.format("Battery priority is now %s", active ? "ACTIVE" : "DISABLED"))
+                    .entity(String.format("Batteriepriorität ist jetzt %s", active ? "AKTIV" : "ABGESCHALTET"))
                     .build();
         } catch (IllegalStateException e) {
             log.error("REST: Failed to set battery priority override: {}", e.getMessage());
             return Response.status(Response.Status.BAD_REQUEST)
-                    .entity(String.format("{\"error\": \"%s\"}", e.getMessage()))
+                    .entity(String.format("{\"Fehler\": \"%s\"}", e.getMessage()))
                     .build();
         }
     }

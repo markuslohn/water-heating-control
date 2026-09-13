@@ -34,7 +34,7 @@ public final class E3dcModbusClient extends AbstractModbusClient {
     public Power readProductionPower() {
         long rawValue = readUnsigned32BitInteger(E3dcRegister.PV_EXTENDED_POWER.getAddress());
         if (rawValue > 0) {
-            rawValue = 4294967296L - readUnsigned32BitInteger(E3dcRegister.PV_EXTENDED_POWER.getAddress());
+            rawValue = 4294967296L - rawValue;
         }
         return Power.ofWatts(rawValue);
     }

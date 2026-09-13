@@ -3,6 +3,7 @@ package de.bimalo.homeauto.control.heatingcontrol;
 import io.smallrye.config.ConfigMapping;
 import io.smallrye.config.WithDefault;
 import jakarta.validation.constraints.Min;
+import java.time.Duration;
 
 /**
  * Configuration for the heating control system.
@@ -30,15 +31,8 @@ public interface HeatingControlConfig {
      * Limits the heating power even if more surplus is available.
      */
     @Min(1)
-    @WithDefault("2900")
+    @WithDefault("2500")
     int maxHeatingPower();
-
-    /**
-     * Schedule interval for the heating control check.
-     * Supports duration expressions like "1m", "30s", "2m30s".
-     */
-    @WithDefault("1m")
-    String scheduleInterval();
 
     /**
      * Master switch to enable/disable battery priority feature completely.
@@ -74,7 +68,7 @@ public interface HeatingControlConfig {
      * This prevents frequent on/off cycling.
      */
     @Min(0)
-    @WithDefault("10.0")
+    @WithDefault("7.0")
     double temperatureHysteresis();
 
     /**
@@ -85,6 +79,24 @@ public interface HeatingControlConfig {
     @Min(0)
     @WithDefault("5")
     int solarPowerReductionPercent();
+
+    /**
+     * Time window over which upward heating power adjustments are averaged to
+     * smooth out short-lived surplus spikes (e.g. passing clouds). Downward
+     * adjustments are not affected and take effect immediately.
+     * Supports duration expressions like "150s", "2m30s".
+     */
+    @WithDefault("150s")
+    Duration powerIncreaseSmoothingWindow();
+
+    /**
+     * Minimum difference in watts between the currently applied heating power and
+     * the newly determined power required to trigger an adjustment. Prevents
+     * chattering adjustments for minor surplus fluctuations.
+     */
+    @Min(0)
+    @WithDefault("100")
+    int minPowerChangeThreshold();
 
     // ========== Seasonal Operating Hours ==========
 

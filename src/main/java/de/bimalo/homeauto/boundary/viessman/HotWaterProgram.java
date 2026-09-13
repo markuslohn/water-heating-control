@@ -7,12 +7,12 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum HotWaterProgram {
 
-    INTERNAL_SHOULD_VALUE(0, "Interner Sollwert"),
-    OFF(1, "Aus"),
-    ON(2, "Ein"),
-    FLOW_TEMPERATURE_SETPOINT(3, "Vorlauftemperatur-Sollwert"),
-    MODULATION_SETPOINT(4, "Modulations-Sollwert"),
-    UNKNOWN(-1, "Unbekanntes Programm");
+    INTERNAL_SHOULD_VALUE(0, "Internal setpoint"),
+    OFF(1, "Off"),
+    ON(2, "On"),
+    FLOW_TEMPERATURE_SETPOINT(3, "Flow temperature setpoint"),
+    MODULATION_SETPOINT(4, "Modulation setpoint"),
+    UNKNOWN(-1, "Unknown program");
 
     private final int value;
     private final String description;

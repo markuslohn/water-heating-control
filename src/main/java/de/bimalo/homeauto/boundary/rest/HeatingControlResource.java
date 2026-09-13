@@ -1,19 +1,18 @@
 package de.bimalo.homeauto.boundary.rest;
 
+import de.bimalo.homeauto.boundary.elwa2.Elwa2Adapter;
 import de.bimalo.homeauto.control.heatingcontrol.HeatingControlService;
-import de.bimalo.homeauto.control.heatingrod.HeatingRodService;
-import de.bimalo.homeauto.entity.Season;
+import de.bimalo.homeauto.entity.HeatingRodStatus;
 import de.bimalo.homeauto.entity.HeatingStatus;
 import de.bimalo.homeauto.entity.Power;
+import de.bimalo.homeauto.entity.Season;
 import de.bimalo.homeauto.entity.Temperature;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
-import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
+import java.time.Clock;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -24,29 +23,48 @@ import lombok.extern.slf4j.Slf4j;
 @Produces(MediaType.APPLICATION_JSON)
 public class HeatingControlResource {
 
-    @Inject
-    HeatingRodService heatingRodService;
+    private final Elwa2Adapter elwa2Adapter;
+    private final HeatingControlService heatingControlService;
+    private final RestStatusConfig restStatusConfig;
 
     @Inject
-    HeatingControlService heatingControlService;
+    public HeatingControlResource(
+            Elwa2Adapter elwa2Adapter,
+            HeatingControlService heatingControlService,
+            RestStatusConfig restStatusConfig) {
+        this.elwa2Adapter = elwa2Adapter;
+        this.heatingControlService = heatingControlService;
+        this.restStatusConfig = restStatusConfig;
+    }
 
     /**
-     * Gets the current heating rod status.
+     * Gets the current heating rod status. Falls back to the last known
+     * status if the live read fails, marked {@code stale=true} - unless that
+     * status is itself too old, in which case this returns 503.
      *
-     * @return current heating status including active state, power, temperatures and manual mode
+     * @return current heating status including active state, power, temperatures
+     *         and manual mode
      */
     @GET
     @Path("/status")
     public HeatingStatus getStatus() {
         log.debug("REST: Getting heating status");
 
-        Power power = heatingRodService.readPower();
-        Temperature currentTemp = heatingRodService.readTemperature1();
-        Temperature targetTemp = heatingRodService.readTargetTemperature();
+        StatusFallback.ResolvedStatus<HeatingRodStatus> resolved = StatusFallback.resolve(
+                elwa2Adapter::readStatus,
+                elwa2Adapter::getLastKnownStatus,
+                HeatingRodStatus::measuredAt,
+                restStatusConfig.maxCacheAge(),
+                Clock.systemUTC());
+        HeatingRodStatus status = resolved.status();
+
+        Power power = status.currentPower();
+        Temperature currentTemp = status.currentTemperature();
+        Temperature targetTemp = status.targetTemperature();
         Season currentSeason = heatingControlService.getCurrentSeason();
 
         return HeatingStatus.builder()
-                .active(power.getWatts() > 0)
+                .active(power.watts() > 0)
                 .power(power)
                 .currentTemperature(currentTemp)
                 .targetTemperature(targetTemp)
@@ -54,37 +72,8 @@ public class HeatingControlResource {
                 .season(currentSeason.getDisplayName())
                 .seasonEmoji(currentSeason.getEmoji())
                 .seasonEnabled(heatingControlService.isCurrentSeasonEnabled())
+                .stale(resolved.stale())
+                .measuredAt(status.measuredAt())
                 .build();
-    }
-
-    /**
-     * Manually controls the heating rod power.
-     * When watts > 0, manual mode is activated and automatic control is suspended.
-     * When watts = 0, manual mode is deactivated and automatic control resumes.
-     *
-     * @param watts the desired power in watts (0 to stop heating and resume automatic control)
-     * @return HTTP response indicating success or failure
-     */
-    @POST
-    @Path("/control")
-    public Response control(@QueryParam("watts") int watts) {
-        log.info("REST: Manual heating control requested with {} W", watts);
-
-        try {
-            if (watts > 0) {
-                heatingControlService.activateManualMode();
-            } else {
-                heatingControlService.deactivateManualMode();
-            }
-            heatingRodService.adjustHeating(Power.ofWatts(watts));
-            return Response.ok()
-                    .entity(String.format("Heating adjusted to %d W (manual mode: %s)",
-                            watts, watts > 0 ? "active" : "inactive"))
-                    .build();
-        } catch (IllegalArgumentException e) {
-            return Response.status(Response.Status.BAD_REQUEST)
-                    .entity(e.getMessage())
-                    .build();
-        }
     }
 }

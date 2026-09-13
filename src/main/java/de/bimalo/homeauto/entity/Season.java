@@ -1,5 +1,6 @@
 package de.bimalo.homeauto.entity;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.Month;
 import lombok.Getter;
@@ -29,7 +30,18 @@ public enum Season {
      * @return the current season
      */
     public static Season current() {
-        return fromMonth(LocalDate.now().getMonthValue());
+        return current(Clock.systemDefaultZone());
+    }
+
+    /**
+     * Determines the current season based on the current date of the given
+     * clock. Lets callers control the notion of "now" (e.g. for testing).
+     *
+     * @param clock the clock to read the current date from
+     * @return the current season
+     */
+    public static Season current(Clock clock) {
+        return fromMonth(LocalDate.now(clock).getMonthValue());
     }
 
     /**

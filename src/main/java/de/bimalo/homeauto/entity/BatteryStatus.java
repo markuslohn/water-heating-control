@@ -1,40 +1,54 @@
 package de.bimalo.homeauto.entity;
 
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import lombok.Builder;
-import lombok.Getter;
 
-/**
- * Data class for the main power data of the battery storage.
- */
-@Getter
 @Builder
-public final class BatteryStatus {
+public record BatteryStatus(
+        Instant measuredAt,
+        Power productionPower,
+        Power consumptionPower,
+        Power batteryPower,
+        Power gridPower,
+        Percentage batteryStateOfCharge) {
 
-    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss");
+    /**
+     * Determines the pure solar power surplus available.
+     * Only counts actual solar production, not battery discharge.
+     *
+     * @param currentHeatingPower power a heating device is currently drawing and
+     *                            which is therefore already included in
+     *                            {@link #consumptionPower()}; excluded from
+     *                            consumption so surplus reflects what is
+     *                            actually free, not artificially reduced by the
+     *                            heating device's own ongoing draw
+     * @return Power surplus from solar only (battery discharge is not counted)
+     */
+    public Power determineSolarPowerSurplus(Power currentHeatingPower) {
+        Power consumptionWithoutHeating = currentHeatingPower.isPositive()
+                ? consumptionPower.reduce(currentHeatingPower)
+                : consumptionPower;
 
-    private final LocalDateTime timestamp;
+        // Base solar surplus: Production - Consumption
+        Power surplusPower = productionPower.reduce(consumptionWithoutHeating);
 
-    private final Power productionPower;
+        // If battery is charging, this solar power is not available for other use
+        if (batteryPower.isPositive()) {
+            surplusPower = surplusPower.reduce(batteryPower);
+        }
 
-    private final Power consumptionPower;
+        // If battery is discharging (negative), we ignore it - it's not solar power
+        if (surplusPower.isNegative()) {
+            return Power.ofWatts(0);
+        } else {
+            return surplusPower;
+        }
+    }
 
-    private final Power batteryPower;
-
-    private final Power gridPower;
-
-    private final Percentage batteryStateOfCharge;
-
-    @Override
-    public String toString() {
-        return String.format(
-                "BatteryStatus[time= %s, PV-Power= %s, Battery-Power= %s, Home consumption= %s, Grid-Power= %s, Battery SOC= %s]",
-                timestamp != null ? timestamp.format(FORMATTER) : "null",
-                productionPower,
-                batteryPower,
-                consumptionPower,
-                gridPower,
-                batteryStateOfCharge);
+    public boolean isOlderThan(Duration maximumAge, Clock clock) {
+        return !measuredAt.plus(maximumAge)
+                .isAfter(clock.instant());
     }
 }
