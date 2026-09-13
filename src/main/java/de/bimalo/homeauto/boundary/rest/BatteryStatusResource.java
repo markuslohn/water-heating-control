@@ -95,12 +95,12 @@ public class BatteryStatusResource {
             boolean active = heatingControlService.isBatteryPriorityActive();
 
             return Response.ok()
-                    .entity(String.format("Battery priority is now %s", active ? "ACTIVE" : "DISABLED"))
+                    .entity(String.format("Batteriepriorität ist jetzt %s", active ? "AKTIV" : "ABGESCHALTET"))
                     .build();
         } catch (IllegalStateException e) {
             log.error("REST: Failed to set battery priority override: {}", e.getMessage());
             return Response.status(Response.Status.BAD_REQUEST)
-                    .entity(String.format("{\"error\": \"%s\"}", e.getMessage()))
+                    .entity(String.format("{\"Fehler\": \"%s\"}", e.getMessage()))
                     .build();
         }
     }
