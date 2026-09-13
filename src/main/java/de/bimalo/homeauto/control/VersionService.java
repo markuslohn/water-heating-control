@@ -51,10 +51,10 @@ public class VersionService {
                 ========================================
                 Application Version Information
                 ----------------------------------------
-                Version:    %s
-                Git Commit: %s
-                Git Branch: %s
-                Build Time: %s
+                Version:    {}
+                Git Commit: {}
+                Git Branch: {}
+                Build Time: {}
                 ========================================
                 """,
                 versionInfo.version(),

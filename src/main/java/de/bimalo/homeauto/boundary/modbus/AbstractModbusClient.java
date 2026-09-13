@@ -122,7 +122,7 @@ public abstract class AbstractModbusClient implements AutoCloseable {
                 try {
                     client.disconnect();
                 } catch (ModbusExecutionException e) {
-                    log.error(String.format("Error when disconnecting modbus client {}:{}", host, port), e);
+                    log.error("Error when disconnecting modbus client {}:{}", host, port, e);
                 }
             }
         }
