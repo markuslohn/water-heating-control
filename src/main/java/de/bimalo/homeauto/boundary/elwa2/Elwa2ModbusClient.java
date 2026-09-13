@@ -1,7 +1,6 @@
 package de.bimalo.homeauto.boundary.elwa2;
 
 import de.bimalo.homeauto.boundary.modbus.AbstractModbusClient;
-import de.bimalo.homeauto.boundary.modbus.ModbusClientException;
 import de.bimalo.homeauto.entity.DeviceInfo;
 import de.bimalo.homeauto.entity.Power;
 import de.bimalo.homeauto.entity.Temperature;

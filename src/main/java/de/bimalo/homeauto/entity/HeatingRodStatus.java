@@ -1,10 +1,9 @@
 package de.bimalo.homeauto.entity;
 
-import lombok.Builder;
-
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import lombok.Builder;
 
 @Builder
 public record HeatingRodStatus(

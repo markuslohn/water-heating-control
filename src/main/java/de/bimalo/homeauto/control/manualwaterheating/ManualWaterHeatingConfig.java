@@ -1,10 +1,9 @@
 package de.bimalo.homeauto.control.manualwaterheating;
 
-import java.time.Duration;
-
 import io.smallrye.config.ConfigMapping;
 import io.smallrye.config.WithDefault;
 import jakarta.validation.constraints.Min;
+import java.time.Duration;
 
 /**
  * Configuration for the manual water heating mode.

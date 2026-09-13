@@ -38,9 +38,11 @@ Do not introduce additional frameworks or libraries unless they provide a clear 
 
 ## **Coding Guidelines**
 
-Follow the Google Java Style Guide:
-
-https://google.github.io/styleguide/javaguide.html
+Follow the project's own formatting rules, enforced via the Spotless Gradle
+plugin (see `build.gradle`): ordered imports, no unused imports, 4-space
+indentation, no trailing whitespace, Unix line endings, and a trailing
+newline at end of file. Run `./gradlew spotlessApply` to auto-fix violations;
+`./gradlew check` (and therefore `build`) fails on unformatted code.
 
 Additionally:
 

@@ -7,7 +7,7 @@ plugins {
 
 group = 'de.bimalo.homeauto'
 
-// Version aus Git-Tags ermitteln
+// Determine version from Git tags
 def getVersionFromGit() {
     try {
         def process = ['git', 'describe', '--tags', '--always', '--dirty'].execute()
@@ -16,7 +16,7 @@ def getVersionFromGit() {
         if (version.isEmpty() || process.exitValue() != 0) {
             return 'dev-SNAPSHOT'
         }
-        // Entferne führendes 'v' wenn vorhanden
+        // Remove leading 'v' if present
         return version.startsWith('v') ? version.substring(1) : version
     } catch (Exception e) {
         return 'dev-SNAPSHOT'
@@ -131,17 +131,17 @@ compileTestJava {
 }
 
 spotless {
-    enforceCheck = false  // Temporarily disable spotless checks
+    enforceCheck = true
     java {
         // Basic formatting rules without Google Java Format
         importOrder()
         removeUnusedImports()
-        indentWithSpaces(4)
+        leadingTabsToSpaces(4)
         trimTrailingWhitespace()
         endWithNewline()
           
         // Ensure consistent line endings
-        lineEndings 'UNIX'
+        lineEndings = 'UNIX'
         
         // Exclude generated files
         targetExclude 'build/**', 'src/main/resources/**', 'src/test/resources/**'

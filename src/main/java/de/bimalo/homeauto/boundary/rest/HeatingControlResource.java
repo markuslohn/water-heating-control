@@ -1,11 +1,11 @@
 package de.bimalo.homeauto.boundary.rest;
 
 import de.bimalo.homeauto.boundary.elwa2.Elwa2Adapter;
-import de.bimalo.homeauto.entity.HeatingRodStatus;
 import de.bimalo.homeauto.control.heatingcontrol.HeatingControlService;
-import de.bimalo.homeauto.entity.Season;
+import de.bimalo.homeauto.entity.HeatingRodStatus;
 import de.bimalo.homeauto.entity.HeatingStatus;
 import de.bimalo.homeauto.entity.Power;
+import de.bimalo.homeauto.entity.Season;
 import de.bimalo.homeauto.entity.Temperature;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;

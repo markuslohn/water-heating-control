@@ -201,7 +201,7 @@ public class HeatingControlService {
             HeatingRodStatus rodStatus = elwa2Adapter.readStatus();
             BatteryStatus batteryStatus = e3dcAdapter.readStatus();
             HeatingDecision decision = automaticPolicy.decide(rodStatus, batteryStatus, isBatteryPriorityActive());
-            
+
             log.debug(decision.toString());
 
             applyAutomaticDecision(decision);

@@ -1,11 +1,10 @@
 package de.bimalo.homeauto.control;
 
+import de.bimalo.homeauto.entity.VersionInfo;
+import jakarta.inject.Inject;
 import org.eclipse.microprofile.health.HealthCheck;
 import org.eclipse.microprofile.health.HealthCheckResponse;
 import org.eclipse.microprofile.health.Liveness;
-
-import de.bimalo.homeauto.entity.VersionInfo;
-import jakarta.inject.Inject;
 
 @Liveness
 public class VersionHealthCheck implements HealthCheck {
