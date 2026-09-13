@@ -117,8 +117,7 @@ public class HeatingControlService {
      */
     @Scheduled(every = "50s", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
     public synchronized void controlManualHeating() {
-        log.debug("ManualHeatingControl");
-        if (!manualPolicy.getState().active()) {
+         if (!manualPolicy.getState().active()) {
             return;
         }
 
@@ -129,6 +128,7 @@ public class HeatingControlService {
 
             HeatingDecision decision = manualPolicy.decide(rodStatus, batteryStatus, gasStatus);
             applyManualDecision(decision);
+            log.info("manual decision: {}", decision);
 
             if (decision.completed()) {
                 manualPolicy.stop();
@@ -192,7 +192,6 @@ public class HeatingControlService {
      * Checks solar surplus and temperature to control the heating rod.
      */
     private synchronized void controlAutomaticHeating() {
-        log.debug("controlAutomaticHeating");
         if (!shouldControlHeating()) {
             return;
         }
@@ -201,8 +200,7 @@ public class HeatingControlService {
             HeatingRodStatus rodStatus = elwa2Adapter.readStatus();
             BatteryStatus batteryStatus = e3dcAdapter.readStatus();
             HeatingDecision decision = automaticPolicy.decide(rodStatus, batteryStatus, isBatteryPriorityActive());
-
-            log.debug(decision.toString());
+            log.info("automatic decision: {}", decision);
 
             applyAutomaticDecision(decision);
 
