@@ -7,28 +7,28 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 
 /**
- * Konfiguration für den E3/DC Batteriespeicher.
+ * Configuration for the E3/DC battery storage system.
  */
 @ConfigMapping(prefix = "e3dc")
 public interface E3dcConfig {
 
     /**
-     * Modbus-spezifische Konfiguration.
+     * Modbus-specific configuration.
      */
     ModbusConfig modbus();
 
     /**
-     * Modbus Konfiguration.
+     * Modbus configuration.
      */
     interface ModbusConfig {
         /**
-         * IP-Adresse oder Hostname des E3/DC Systems.
+         * IP address or hostname of the E3/DC system.
          */
         @NotBlank
         String host();
 
         /**
-         * TCP-Port des E3/DC Systems.
+         * TCP port of the E3/DC system.
          */
         @Min(1)
         @Max(65535)

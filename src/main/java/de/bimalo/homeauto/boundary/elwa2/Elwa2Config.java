@@ -13,22 +13,22 @@ import jakarta.validation.constraints.NotBlank;
 public interface Elwa2Config {
 
     /**
-     * Modbus-spezifische Konfiguration.
+     * Modbus-specific configuration.
      */
     ModbusConfig modbus();
 
     /**
-     * Modbus Konfiguration.
+     * Modbus configuration.
      */
     interface ModbusConfig {
         /**
-         * IP-Adresse oder Hostname des E3/DC Systems.
+         * IP address or hostname of the ELWA2 heating rod.
          */
         @NotBlank
         String host();
 
         /**
-         * TCP-Port des E3/DC Systems.
+         * TCP port of the ELWA2 heating rod.
          */
         @Min(1)
         @Max(65535)

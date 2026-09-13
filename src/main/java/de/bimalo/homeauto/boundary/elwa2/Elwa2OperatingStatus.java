@@ -29,11 +29,10 @@ public enum Elwa2OperatingStatus {
     private final String description;
 
     /**
-     * Konvertiert einen Rohwert in einen Elwa2OperatingStatus.
+     * Converts a raw value into an Elwa2OperatingStatus.
      *
-     * @param value der Rohwert aus dem Modbus-Register
-     * @return den entsprechenden Status, oder UNKNOWN wenn der Wert nicht definiert
-     *         ist
+     * @param value the raw value from the Modbus register
+     * @return the corresponding status, or UNKNOWN if the value is not defined
      */
     public static Elwa2OperatingStatus fromValue(int value) {
         for (Elwa2OperatingStatus status : values()) {
@@ -45,18 +44,18 @@ public enum Elwa2OperatingStatus {
     }
 
     /**
-     * Prüft, ob der Status einen Fehler anzeigt.
+     * Checks whether the status indicates an error.
      *
-     * @return true wenn es sich um einen Fehlerstatus handelt (Wert >= 200)
+     * @return true if this is an error status (value >= 200)
      */
     public boolean isError() {
         return value >= 200;
     }
 
     /**
-     * Prüft, ob der Heizstab aktiv heizt.
+     * Checks whether the heating rod is actively heating.
      *
-     * @return true wenn HEAT oder BOOST_HEAT
+     * @return true if HEAT or BOOST_HEAT
      */
     public boolean isHeating() {
         return this == HEAT || this == BOOST_HEAT || this == LEGIONELLA_BOOST_ACTIVE;
